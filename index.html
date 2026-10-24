@@ -10,7 +10,7 @@
   --bg:#f6f3ec;--panel:#fffdf8;--ink:#23211d;--sub:#7a746a;--line:#e2ddd2;
   --accent:#c8553d;--ev:#2f6db5;--era1:rgba(120,100,60,.07);--era2:rgba(120,100,60,.0);
   --bs:52%;--bl:50%;--ovl:rgba(200,85,61,.13);--onaccent:#fff;
-  --namew:150px;--colw:36px;
+  --namew:150px;--colw:calc(36px*var(--fs));--fs:1;
 }
 :root[data-theme="white"]{--bg:#ffffff;--panel:#ffffff;--ink:#111111;--sub:#666666;--line:#dddddd;
   --accent:#d0472b;--ev:#1f5fbf;--era1:rgba(0,0,0,.045);--era2:rgba(0,0,0,0);--bs:58%;--bl:48%;--ovl:rgba(208,71,43,.12)}
@@ -22,7 +22,10 @@
   :root[data-theme="auto"]{--bg:#1c1d20;--panel:#25262a;--ink:#ecebe7;--sub:#9a978f;--line:#393a3f;
     --accent:#ff7d5e;--ev:#6ea8ff;--era1:rgba(255,255,255,.05);--era2:rgba(255,255,255,0);--bs:55%;--bl:55%;--ovl:rgba(255,125,94,.16)}
 }
-:root[data-theme="board"] body{font-family:"Klee One","Hiragino Maru Gothic ProN","Yu Gothic",system-ui,sans-serif}
+:root[data-font="ud"] body{font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic",system-ui,sans-serif}
+:root[data-font="min"] body{font-family:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif}
+:root[data-font="maru"] body{font-family:"Zen Maru Gothic","Hiragino Maru Gothic ProN",system-ui,sans-serif}
+:root[data-font="hand"] body{font-family:"Klee One","Hiragino Maru Gothic ProN",system-ui,sans-serif}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
   font-family:system-ui,"Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;font-size:14px}
@@ -63,6 +66,10 @@ label.ck{display:inline-flex;gap:4px;align-items:center;font-size:13px;color:var
 .setgrid{display:flex;flex-wrap:wrap;gap:8px 14px}
 .setgrid label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--sub)}
 .setgrid select{min-width:120px}
+.setgrid label.wide{flex:1 1 100%}
+.setgrid label.wide input{max-width:480px}
+.sh{font-size:12px;font-weight:700;color:var(--ink);margin:10px 0 5px;padding-bottom:2px;border-bottom:1px dashed var(--line)}
+.sh:first-child{margin-top:0}
 .menu{position:relative}
 .mpop{position:absolute;right:0;top:calc(100% + 4px);background:var(--panel);border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.2);padding:6px;display:none;z-index:40;min-width:190px}
 .mpop.on{display:flex;flex-direction:column;gap:4px}
@@ -70,6 +77,14 @@ label.ck{display:inline-flex;gap:4px;align-items:center;font-size:13px;color:var
 .mpop button:hover{background:var(--bg)}
 .mpop hr{border:0;border-top:1px solid var(--line);margin:2px 0;width:100%}
 #clear{color:var(--accent)}
+.capturing .hscroll,.capturing .vscroll{max-height:none!important;overflow:visible!important}
+.capturing .hinner,.capturing .H .track,.capturing .V .col{overflow:hidden}
+.capturing .credit{display:block}
+.capturing{padding:14px 16px 10px;background:var(--bg)}
+.capturing #info,.capturing #zbar{display:none!important}
+.capturing .ttl{box-shadow:none!important;background:none!important}
+.capturing .chart{max-width:none}
+.capturing .grip{visibility:hidden}
 .searchbox input{width:100%}
 .dd{position:absolute;left:0;right:0;top:100%;margin-top:3px;background:var(--panel);border:1px solid var(--line);
   border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.15);z-index:30;max-height:360px;overflow:auto;display:none}
@@ -93,8 +108,9 @@ label.ck{display:inline-flex;gap:4px;align-items:center;font-size:13px;color:var
 .dd .it .tg{font-size:10px;border:1px solid var(--line);border-radius:3px;padding:0 3px;margin-left:4px;color:var(--sub)}
 details summary{cursor:pointer;color:var(--sub);font-size:12.5px}
 textarea{width:100%;min-height:80px}
-.title{width:100%;font-size:20px;font-weight:700;border:0;background:transparent;padding:4px 2px;margin:2px 0 4px}
-.title:focus{outline:1px dashed var(--line);background:var(--panel)}
+.ttl{font-size:calc(20px*var(--fs));margin:4px 2px 6px;font-weight:700;outline:none;border-radius:6px}
+.ttl:hover,.ttl:focus{background:var(--panel);box-shadow:0 0 0 1px var(--line)}
+.credit{display:none;font-size:11px;color:var(--sub);text-align:right;padding:4px 4px 0}
 #info{min-height:20px;color:var(--sub);font-size:12.5px;margin:2px 2px 6px}
 #info b{color:var(--accent)}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);
@@ -103,40 +119,40 @@ textarea{width:100%;min-height:80px}
 .empty{padding:40px 10px;text-align:center;color:var(--sub);line-height:1.9}
 
 /* ===== グラフ共通 ===== */
-.chart{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 10px 12px;user-select:none;position:relative}
+.chart{font-size:calc(14px*var(--fs));background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 10px 12px;user-select:none;position:relative}
 .era,.gridl,.ovl,.cline,.evl{position:absolute;pointer-events:none}
 .ovl{background:var(--ovl)}
-.cyear{position:absolute;background:var(--accent);color:var(--onaccent);font-size:11px;border-radius:5px;padding:1px 6px;display:none;z-index:6;white-space:nowrap;pointer-events:none}
-.bar{position:absolute;overflow:hidden;cursor:pointer;font-size:11px;color:#fff;border-radius:5px;box-shadow:none}
+.cyear{position:absolute;background:var(--accent);color:var(--onaccent);font-size:calc(11px*var(--fs));border-radius:5px;padding:1px 6px;display:none;z-index:6;white-space:nowrap;pointer-events:none}
+.bar{position:absolute;overflow:hidden;cursor:pointer;font-size:calc(11px*var(--fs));color:#fff;border-radius:5px;box-shadow:none}
 .bar .lb{position:absolute;display:flex;align-items:center;gap:5px;padding:0 6px;white-space:nowrap;text-shadow:0 0 3px rgba(0,0,0,.35)}
 .bar .lb b,.lbo b{font-weight:700}
 .bar.period{border-radius:1px}
 .bar.period::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(135deg,rgba(255,255,255,.22) 0 5px,transparent 5px 10px);pointer-events:none}
-.lbo{position:absolute;display:none;align-items:center;gap:5px;font-size:11px;color:var(--ink);white-space:nowrap;pointer-events:none}
+.lbo{position:absolute;display:none;align-items:center;gap:5px;font-size:calc(11px*var(--fs));color:var(--ink);white-space:nowrap;pointer-events:none}
 .lbo span{color:var(--sub)}
-.age{position:absolute;font-size:11px;background:var(--panel);border:1px solid var(--line);color:var(--ink);
+.age{position:absolute;font-size:calc(11px*var(--fs));background:var(--panel);border:1px solid var(--line);color:var(--ink);
   border-radius:4px;padding:0 4px;display:none;pointer-events:none;z-index:4;white-space:nowrap}
 .sel .bar{outline:2.5px solid var(--ink);outline-offset:1px}
 .dh{cursor:default}
-.dh .grip{color:var(--sub);opacity:.5;font-size:11px;letter-spacing:-2px}
-.dh .x{border:0;background:none;color:var(--sub);padding:0 3px;font-size:14px;visibility:hidden;cursor:pointer}
+.dh .grip{color:var(--sub);opacity:.5;font-size:calc(11px*var(--fs));letter-spacing:-2px}
+.dh .x{border:0;background:none;color:var(--sub);padding:0 3px;font-size:calc(14px*var(--fs));visibility:hidden;cursor:pointer}
 .dh:hover .x{visibility:visible}
-.dh .tag{font-size:10px;color:var(--sub);border:1px solid var(--line);border-radius:3px;padding:0 3px}
+.dh .tag{font-size:calc(10px*var(--fs));color:var(--sub);border:1px solid var(--line);border-radius:3px;padding:0 3px}
 .dragging{opacity:.45}
-.seglb{position:absolute;overflow:hidden;white-space:nowrap;font-size:10.5px;color:var(--sub)}
-.gseg{position:absolute;overflow:hidden;white-space:nowrap;font-size:10px;color:var(--sub);border-color:var(--line);border-style:solid;border-width:0}
+.seglb{position:absolute;overflow:hidden;white-space:nowrap;font-size:calc(10.5px*var(--fs));color:var(--sub)}
+.gseg{position:absolute;overflow:hidden;white-space:nowrap;font-size:calc(10px*var(--fs));color:var(--sub);border-color:var(--line);border-style:solid;border-width:0}
 .gseg.alt{background:var(--era1)}
 .gseg{cursor:pointer}
 .gseg.tiny{background:none!important;color:transparent!important;overflow:visible}
 .H .gseg.tiny::after{content:"";position:absolute;top:0;bottom:0;left:-4px;right:-4px}
 .V .gseg.tiny::after{content:"";position:absolute;left:0;right:0;top:-4px;bottom:-4px}
-.gpop{position:fixed;z-index:60;background:var(--ink);color:var(--bg);font-size:12px;padding:4px 8px;border-radius:6px;white-space:nowrap;pointer-events:none;display:none;box-shadow:0 3px 10px rgba(0,0,0,.25)}
-.evlb{position:absolute;font-size:10.5px;color:var(--ev);white-space:nowrap;background:var(--panel);padding:0 3px;border-radius:3px;z-index:3;pointer-events:auto;cursor:pointer}
+.gpop{position:fixed;z-index:60;background:var(--ink);color:var(--bg);font-size:calc(12px*var(--fs));padding:4px 8px;border-radius:6px;white-space:nowrap;pointer-events:none;display:none;box-shadow:0 3px 10px rgba(0,0,0,.25)}
+.evlb{position:absolute;font-size:calc(10.5px*var(--fs));color:var(--ev);white-space:nowrap;background:var(--panel);padding:0 3px;border-radius:3px;z-index:3;pointer-events:auto;cursor:pointer}
 .evlb:hover{text-decoration:underline}
-.evpop{position:fixed;z-index:61;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.22);padding:8px 10px;font-size:13px;display:none;max-width:280px}
+.evpop{position:fixed;z-index:61;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.22);padding:8px 10px;font-size:calc(13px*var(--fs));display:none;max-width:280px}
 .evpop .t{font-weight:700;margin-bottom:2px}
-.evpop .nt{color:var(--sub);font-size:11.5px;margin-bottom:6px}
-.evpop button{font-size:12px;padding:4px 10px;color:var(--accent)}
+.evpop .nt{color:var(--sub);font-size:calc(11.5px*var(--fs));margin-bottom:6px}
+.evpop button{font-size:calc(12px*var(--fs));padding:4px 10px;color:var(--accent)}
 .evl{border-color:var(--ev);border-style:dashed;border-width:0;opacity:.8}
 
 /* ===== 横 ===== */
@@ -148,18 +164,18 @@ textarea{width:100%;min-height:80px}
 .H .namecol{width:var(--namew);flex:none}
 .H .atrack{position:relative;flex:1;border-bottom:1px solid var(--line)}
 .H .arow{position:relative}
-.H .arow.era{height:15px}
-.H .arow.gen{height:16px;border-top:1px solid var(--line)}
-.H .arow.ev{height:16px}
-.H .arow.tk{height:24px}
-.H .arow.tk.g2{height:36px}
-.H .arow.tk.g3{height:48px}
-.H .seglb{top:0;height:15px;padding-left:3px}
-.H .gseg{top:1px;height:14px;line-height:14px;padding-left:2px;border-left-width:1px}
-.H .gseg.n{height:7px;line-height:7px;font-size:7px}
-.H .gseg.s{top:8px;height:7px;line-height:7px;font-size:7px}
-.H .tick{position:absolute;bottom:0;transform:translateX(-50%);font-size:11px;color:var(--sub);padding-bottom:3px;white-space:nowrap;text-align:center;line-height:1.15}
-.H .tick small{display:block;font-size:9.5px}
+.H .arow.era{height:calc(15px*var(--fs))}
+.H .arow.gen{height:calc(16px*var(--fs));border-top:1px solid var(--line)}
+.H .arow.ev{height:calc(16px*var(--fs))}
+.H .arow.tk{height:calc(24px*var(--fs))}
+.H .arow.tk.g2{height:calc(36px*var(--fs))}
+.H .arow.tk.g3{height:calc(48px*var(--fs))}
+.H .seglb{top:0;height:calc(15px*var(--fs));padding-left:3px}
+.H .gseg{top:1px;height:calc(14px*var(--fs));line-height:calc(14px*var(--fs));padding-left:2px;border-left-width:1px}
+.H .gseg.n{height:7px;line-height:7px;font-size:calc(7px*var(--fs))}
+.H .gseg.s{top:8px;height:7px;line-height:7px;font-size:calc(7px*var(--fs))}
+.H .tick{position:absolute;bottom:0;transform:translateX(-50%);font-size:calc(11px*var(--fs));color:var(--sub);padding-bottom:3px;white-space:nowrap;text-align:center;line-height:1.15}
+.H .tick small{display:block;font-size:calc(9.5px*var(--fs))}
 .H .evlb{top:1px;transform:translateX(-50%)}
 .H .cyear{bottom:3px;transform:translateX(-50%)}
 .H .body{position:relative}
@@ -169,7 +185,7 @@ textarea{width:100%;min-height:80px}
 .H .ovl{border-left:1px solid var(--accent);border-right:1px solid var(--accent)}
 .H .cline{border-left:1.5px solid var(--accent);display:none}
 .H .evl{border-left-width:1.5px}
-.H .row{display:flex;align-items:center;height:30px;position:relative}
+.H .row{display:flex;align-items:center;height:calc(30px*var(--fs));position:relative}
 .H .row.ins-b{box-shadow:inset 0 3px 0 var(--accent)}
 .H .row.ins-a{box-shadow:inset 0 -3px 0 var(--accent)}
 .H .name{width:var(--namew);flex:none;display:flex;align-items:center;gap:3px;padding:0 8px 0 4px;overflow:hidden;height:100%;position:sticky;left:0;z-index:3;background:var(--panel)}
@@ -182,13 +198,13 @@ textarea{width:100%;min-height:80px}
 .H .name span.nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .H .sel .name span.nm{font-weight:700}
 .H .track{position:relative;flex:1;height:100%}
-.H .bar{top:5px;height:20px}
+.H .bar{top:calc(5px*var(--fs));height:calc(20px*var(--fs))}
 .H .bar .lb{top:0;bottom:0}
 .H .bar.fb{border-top-left-radius:0;border-bottom-left-radius:0}
 .H .bar.fd,.H .bar.unknown,.H .bar.alive{border-top-right-radius:0;border-bottom-right-radius:0}
 .H .bar.alive{box-shadow:inset -3px 0 0 rgba(255,255,255,.55)}
-.H .lbo{top:5px;height:20px}
-.H .age{top:6px;transform:translateX(4px)}
+.H .lbo{top:calc(5px*var(--fs));height:calc(20px*var(--fs))}
+.H .age{top:calc(6px*var(--fs));transform:translateX(4px)}
 
 /* ===== 縦 ===== */
 .V{padding:0;overflow:hidden}
@@ -196,19 +212,19 @@ textarea{width:100%;min-height:80px}
 .V .vgrid{display:grid;position:relative}
 .V .corner{position:sticky;top:0;left:0;z-index:8;background:var(--panel);border-bottom:1px solid var(--line);border-right:1px solid var(--line)}
 .V .vhead{position:sticky;top:0;z-index:7;background:var(--panel);border-bottom:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:4px 0;gap:3px;overflow:hidden}
-.V .vhead span.nm{writing-mode:vertical-rl;font-size:12.5px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-height:0}
+.V .vhead span.nm{writing-mode:vertical-rl;font-size:calc(12.5px*var(--fs));line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-height:0}
 .V .vhead .grip{writing-mode:horizontal-tb;letter-spacing:-2px}
 .V .vhfill{position:sticky;top:0;z-index:7;background:var(--panel);border-bottom:1px solid var(--line)}
 .V .vhead.ins-b{box-shadow:inset 3px 0 0 var(--accent)}
 .V .vhead.ins-a{box-shadow:inset -3px 0 0 var(--accent)}
 .V .sel.vhead span.nm{font-weight:700}
 .V .vaxis{position:sticky;left:0;z-index:6;background:var(--panel);border-right:1px solid var(--line)}
-.V .seglb{left:0;width:18px;writing-mode:vertical-rl;padding-top:3px;line-height:18px}
-.V .gseg{width:18px;writing-mode:vertical-rl;padding-top:2px;line-height:17px;border-top-width:1px}
-.V .gseg.n{width:9px;line-height:9px;font-size:7px}
-.V .gseg.s{width:9px;line-height:9px;font-size:7px}
-.V .tick{position:absolute;right:4px;transform:translateY(-50%);font-size:11px;color:var(--sub);white-space:nowrap;text-align:right;line-height:1.1}
-.V .tick small{display:block;font-size:9.5px}
+.V .seglb{left:0;width:calc(18px*var(--fs));writing-mode:vertical-rl;padding-top:3px;line-height:calc(18px*var(--fs))}
+.V .gseg{width:calc(18px*var(--fs));writing-mode:vertical-rl;padding-top:2px;line-height:calc(17px*var(--fs));border-top-width:1px}
+.V .gseg.n{width:calc(9px*var(--fs));line-height:calc(9px*var(--fs));font-size:calc(7px*var(--fs))}
+.V .gseg.s{width:calc(9px*var(--fs));line-height:calc(9px*var(--fs));font-size:calc(7px*var(--fs))}
+.V .tick{position:absolute;right:4px;transform:translateY(-50%);font-size:calc(11px*var(--fs));color:var(--sub);white-space:nowrap;text-align:right;line-height:1.1}
+.V .tick small{display:block;font-size:calc(9.5px*var(--fs))}
 .V .cyear{transform:translateY(-50%);z-index:9}
 .V .vbody{position:relative}
 .V .bg{position:absolute;inset:0;pointer-events:none}
@@ -220,24 +236,24 @@ textarea{width:100%;min-height:80px}
 .V .evlb{left:2px;transform:translateY(-100%)}
 .V .cols{position:absolute;inset:0;display:flex}
 .V .col{position:relative;width:var(--colw);flex:none;height:100%}
-.V .bar{left:6px;width:24px}
-.V .bar .lb{left:0;right:0;writing-mode:vertical-rl;padding:6px 0;justify-content:flex-start;line-height:24px}
+.V .bar{left:calc(6px*var(--fs));width:calc(24px*var(--fs))}
+.V .bar .lb{left:0;right:0;writing-mode:vertical-rl;padding:6px 0;justify-content:flex-start;line-height:calc(24px*var(--fs))}
 .V .bar.fb{border-top-left-radius:0;border-top-right-radius:0}
 .V .bar.fd,.V .bar.unknown,.V .bar.alive{border-bottom-left-radius:0;border-bottom-right-radius:0}
 .V .bar.alive{box-shadow:inset 0 -3px 0 rgba(255,255,255,.55)}
-.V .lbo{left:6px;width:24px;writing-mode:vertical-rl;justify-content:flex-start;line-height:24px}
+.V .lbo{left:calc(6px*var(--fs));width:calc(24px*var(--fs));writing-mode:vertical-rl;justify-content:flex-start;line-height:calc(24px*var(--fs))}
 .V .age{left:2px;transform:translateY(-120%)}
 @media (max-width:640px){:root{--namew:96px}}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.14</span><span class="lbl" id="dataStat"></span></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.15</span><span class="lbl" id="dataStat"></span></header>
 <div class="wrap">
 
   <div class="panel">
     <div class="ctrl topbar">
       <div class="searchbox">
-        <input type="text" id="q" placeholder="名前を入れて追加（例：織田信長）" autocomplete="off">
+        <input type="text" id="q" placeholder="人・できごと・期間を探して追加（例：織田信長、応仁の乱）" autocomplete="off">
         <div class="dd" id="dd"></div>
       </div>
       <span class="seg" id="orient"><button data-o="h" class="on" title="横表示（時間が左→右）">↔️</button><button data-o="v" title="縦表示（時間が上→下）">↕️</button></span>
@@ -245,6 +261,10 @@ textarea{width:100%;min-height:80px}
       <button class="tog" data-sec="set" aria-expanded="false">⚙ 設定</button>
       <span class="menu"><button id="moreBtn" title="保存・読み込みなど">⋯</button>
         <div class="mpop" id="morePop">
+          <button id="shotSaveV">🖼 画像で保存（見えてる範囲）</button>
+          <button id="shotSaveA">🖼 画像で保存（全体）</button>
+          <button id="shotCopyV">📋 画像をコピー（見えてる範囲）</button>
+          <hr>
           <button id="saveJson">保存（JSON）</button>
           <button id="loadJson">読み込み（JSON）</button>
           <button id="share">共有URLをコピー</button>
@@ -258,28 +278,42 @@ textarea{width:100%;min-height:80px}
     </div>
 
     <div class="sec" id="sec-set" hidden>
+      <div class="sh">見た目</div>
       <div class="setgrid">
-        <label>並べ順<select id="sort">
-          <option value="birth">生まれ順</option><option value="death">没年順</option><option value="life">享年順</option><option value="added">自分で並べた順</option>
-        </select></label>
-        <label>背景<select id="era">
-          <option value="jp">日本の時代</option><option value="world">世界の時代</option><option value="cn">中国の王朝</option><option value="none">なし</option>
-        </select></label>
+        <label class="wide">題名（入れるとグラフの上とたぶの名前に出る）<input type="text" id="title" placeholder="例：幕末の人たち"></label>
         <label>色<select id="theme">
           <option value="auto">自動</option><option value="cream">クリーム</option><option value="white">白</option><option value="dark">黒</option><option value="board">黒板</option>
         </select></label>
+        <label>フォント<select id="font">
+          <option value="sys">ゴシック</option><option value="ud">UDゴシック</option><option value="min">明朝</option><option value="maru">丸ゴシック</option><option value="hand">手書き風</option>
+        </select></label>
+        <label>文字の大きさ<select id="fs">
+          <option value="0.85">小</option><option value="1">中</option><option value="1.25">大</option><option value="1.6">特大</option>
+        </select></label>
         <label>名前の場所<select id="lpos">
           <option value="in">帯の中</option><option value="after">帯の外・うしろ</option><option value="before">帯の外・まえ</option>
+        </select></label>
+      </div>
+      <div class="sh">時代・元号</div>
+      <div class="setgrid">
+        <label>背景の時代<select id="era">
+          <option value="jp">日本の時代</option><option value="world">世界の時代</option><option value="cn">中国の王朝</option><option value="none">なし</option>
         </select></label>
         <label>元号<select id="gmode">
           <option value="jp">日本</option><option value="cn">中国</option><option value="both">日本＋中国</option><option value="none">なし</option>
         </select></label>
       </div>
-      <div class="ctrl" style="margin-top:8px">
+      <div class="ctrl" style="margin-top:6px">
+        <label class="ck"><input type="checkbox" id="eralbl"> 時代の名前</label>
         <label class="ck"><input type="checkbox" id="glabel"> なぞった年に元号</label>
         <label class="ck"><input type="checkbox" id="gtick"> 目盛りに元号</label>
         <label class="ck"><input type="checkbox" id="gband"> 元号の帯</label>
-        <label class="ck"><input type="checkbox" id="eralbl"> 時代の名前</label>
+      </div>
+      <div class="sh">並べ方</div>
+      <div class="setgrid">
+        <label>並べ順<select id="sort">
+          <option value="birth">生まれ順</option><option value="death">没年順</option><option value="life">享年順</option><option value="added">自分で並べた順</option>
+        </select></label>
       </div>
     </div>
 
@@ -297,13 +331,7 @@ textarea{width:100%;min-height:80px}
       </details>
       <details style="margin-top:6px" id="manBox">
         <summary>自分で追加（期間・できごと）</summary>
-        <div class="ctrl" style="margin-top:6px">
-          <div class="searchbox">
-            <input type="text" id="wq" placeholder="Wikidataで探す（例：アウステルリッツ、応仁の乱、ムガル帝国）" autocomplete="off">
-            <div class="dd" id="wdd"></div>
-          </div>
-        </div>
-        <div class="lbl" style="margin:6px 0 2px">または手で入れる（終わりが空か、始まりと同じ年なら「できごと（線）」、ちがえば「期間（帯）」になる）</div>
+        <div class="lbl" style="margin:6px 0 2px">Wikidataにないものは手で入れる（上の検索欄で探せるものは、そっちが早い。終わりが空か、始まりと同じ年なら「できごと（線）」、ちがえば「期間（帯）」になる）</div>
         <div class="ctrl">
           <input type="text" id="mName" placeholder="名前（例：応仁の乱）" style="flex:1 1 180px;max-width:260px">
           <input type="text" id="mS" placeholder="始まり（例：1467）" style="width:130px">
@@ -323,7 +351,8 @@ textarea{width:100%;min-height:80px}
     </div>
   </div>
 
-  <input type="text" class="title" id="title" placeholder="題名（なくてもOK）">
+  <div id="cap">
+  <h2 class="ttl" id="titleH" contenteditable="plaintext-only" spellcheck="false" hidden></h2>
   <div id="info"></div>
   <div class="zbar" id="zbar">
     <button id="namesBtn" title="名前の列をひらく・たたむ">名前の列</button>
@@ -331,6 +360,8 @@ textarea{width:100%;min-height:80px}
     <div class="mini" id="mini" title="全体図：枠をつまんで動かす／はしを引っぱって拡大縮小"><div class="mlines" id="mlines"></div><div class="mwin" id="mwin"><i class="mh l"></i><i class="mh r"></i></div><span class="mlab l" id="mlabL"></span><span class="mlab r" id="mlabR"></span></div>
   </div>
   <div class="chart H" id="chart"></div>
+  <div class="credit" id="credit"></div>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 <div class="gpop" id="gpop"></div>
@@ -613,7 +644,7 @@ let events = [];            // できごと {id,n,y}
 let selected = [];
 let colorIdx = {}, nextColor = 0, manSeq = 1;
 const SET_KEY='sbg_view_v1';
-const SET = Object.assign({orient:'h', gtick:false, gband:false, vscale:1, gmode:'jp', theme:'auto', glabel:true, eralbl:true, lpos:'in'}, lsGet(SET_KEY)||{});
+const SET = Object.assign({font:'sys', fs:1, orient:'h', gtick:false, gband:false, vscale:1, gmode:'jp', theme:'auto', glabel:true, eralbl:true, lpos:'in'}, lsGet(SET_KEY)||{});
 
 /* ---------- 小物 ---------- */
 function $(s){ return document.querySelector(s); }
@@ -798,9 +829,11 @@ let READY=false;            // 起動が終わるまでURLは書きかえない�
 function syncURLSoon(){ clearTimeout(syncURLSoon._t); syncURLSoon._t=setTimeout(syncURL, 400); }
 // 見た目の設定をURL用の短い文字に：向き-色-元号-ちぇっく-背景-並べ順
 function viewCode(){ const f=(SET.gtick?1:0)+(SET.gband?2:0)+(SET.glabel?4:0)+(SET.eralbl?8:0);
-  return [SET.orient, SET.theme, SET.gmode, f, $('#era').value, $('#sort').value, SET.lpos].join('-'); }
+  return [SET.orient, SET.theme, SET.gmode, f, $('#era').value, $('#sort').value, SET.lpos, SET.font, String(SET.fs||1)].join('-'); }
 function readViewCode(v){
-  const [o,th,g,f,era,sort,lp]=(v||'').split('-'); if(!o) return;
+  const [o,th,g,f,era,sort,lp,fo,fz]=(v||'').split('-'); if(!o) return;
+  if(['sys','ud','min','maru','hand'].includes(fo)) SET.font=fo;
+  if(['0.85','1','1.25','1.6'].includes(fz)) SET.fs=+fz;
   if(['in','after','before'].includes(lp)) SET.lpos=lp;
   if(o==='h'||o==='v') SET.orient=o;
   if(['auto','cream','white','dark','board'].includes(th)) SET.theme=th;
@@ -964,6 +997,7 @@ function barOf(p){
 /* ---------- 描画 ---------- */
 let geo = null; // {min,max,V,AX,HEAD}
 let AX_=0, HEAD_=118;
+let RANGE=null;   // 画像を作るときだけ使う、表示する年の範囲
 let ZOOM=1, pendingAnchor=null;   // ズーム倍率と、描きなおしたあとに合わせる年
 const ZMAX=400;
 // いま見えてる真ん中の年（描きなおしても同じところを見るため）
@@ -996,6 +1030,11 @@ function render(){
   let max = Math.max(...bars.map(b=>b.g.right), ...events.map(e=>e.y));
   const span0 = Math.max(max-min, 10), pad = Math.max(2, Math.round(span0*0.03));
   min -= pad; max += pad;
+  if(RANGE){   // 画像「見えてる範囲」：その年だけ、そこにいる人だけ
+    min=RANGE.min; max=RANGE.max;
+    for(let k=bars.length-1;k>=0;k--){ const g=bars[k].g; if(g.right<=min || g.left>=max) bars.splice(k,1); }
+  }
+  const evShow = RANGE ? events.filter(e=>e.y>=min && e.y<=max) : events;
   geo = {min,max,V};
   const P = y => ((y-min)/(max-min)*100).toFixed(3)+'%';
   const S = (a,b) => ((b-a)/(max-min)*100).toFixed(3)+'%';
@@ -1003,7 +1042,7 @@ function render(){
   // 縦の長さ（px）
   const span = max-min;
   const narrow = window.innerWidth<=640;
-  const NW = UI.names ? (narrow?96:150) : 24;                      // 名前の列の幅
+  const NW = Math.round((UI.names ? (narrow?96:150) : 24) * (SET.fs||1));                      // 名前の列の幅
   const baseLen = V ? Math.round(Math.max(480, Math.min(span*7, 2600))) : Math.max(200, chart.clientWidth - NW - 10);
   ZOOM = Math.max(1, Math.min(ZMAX, span/3, ZOOM));   // いちばん拡大しても3年ぶんは見える
   const LEN = Math.round(baseLen * ZOOM);                           // 時間の軸の長さ（px）
@@ -1044,7 +1083,7 @@ function render(){
   eraList.forEach(([nm,a,b],k)=>{ bg += `<div class="era" style="${box(a,b)};background:${k%2?'var(--era2)':'var(--era1)'}"></div>`; });
   ticks.forEach(t=>{ bg += `<div class="gridl" style="${pos(t)}"></div>`; });
   if(ovlR) bg += `<div class="ovl" style="${box(ovlR[0],ovlR[1])}"></div>`;
-  events.forEach(ev=>{ bg += `<div class="evl" style="${pos(ev.y)}"></div>`; });
+  evShow.forEach(ev=>{ bg += `<div class="evl" style="${pos(ev.y)}"></div>`; });
   bg += `<div class="cline" id="cline"></div>`;
 
   // 軸の中身
@@ -1054,7 +1093,7 @@ function render(){
     return `<div class="gseg ${g.lane==='all'?'':g.lane} ${(gk++)%2?'alt':''}" style="${extra||''}${box(g.s,g.e)}" data-pop="${esc(nm)}">${esc(g.n)}</div>`; };
   const genRows = bands.map(b=>`<div class="arow gen">${b.segs.map(g=>segHTML(g)).join('')}</div>`).join('');
   const tickLbl = ticks.map(t=>{ const gt=tickG(t); return `<div class="tick" style="${pos(t)}">${fmtY(t)}${gt.map(x=>`<small>${esc(x)}</small>`).join('')}</div>`; }).join('');
-  const evLbl = events.map(ev=>`<div class="evlb" data-eid="${ev.id}" style="${pos(ev.y)}" title="押すと「消す」が出る">${esc(fmtY(ev.y))} ${esc(ev.n)}</div>`).join('');
+  const evLbl = evShow.map(ev=>`<div class="evlb" data-eid="${ev.id}" style="${pos(ev.y)}" title="押すと「消す」が出る">${esc(fmtY(ev.y))} ${esc(ev.n)}</div>`).join('');
 
   const handle = p => `<span class="grip">⋮⋮</span><button class="x" title="消す" data-rm="${p.id}">×</button>`;
   const barHTML = (p,g) => `<div class="${g.cls}" data-sel="${p.id}" style="${box(g.left,g.right)};background:linear-gradient(${V?'180deg':'90deg'}, ${g.st.join(', ')})" title="${esc(p.n)} ${esc(g.txt)}${g.note?'&#10;'+esc(g.note):''}"><span class="lb" style="${V?'top':'left'}:${g.lbAt}"><b>${esc(p.n)}</b>${esc(g.txt)}</span></div>
@@ -1070,16 +1109,17 @@ function render(){
       <div class="axis"><div class="namecol"></div><div class="atrack" id="atrack">
         ${SET.eralbl?`<div class="arow era">${eraLbl}</div>`:''}
         ${genRows}
-        ${events.length?`<div class="arow ev">${evLbl}</div>`:''}
+        ${evShow.length?`<div class="arow ev">${evLbl}</div>`:''}
         <div class="arow tk${showGT?(gtLines===2?' g3':' g2'):''}" id="tkrow">${tickLbl}<div class="cyear" id="cyear"></div></div>
       </div></div>
       <div class="body" id="cbody"><div class="bg">${bg}</div>${rows}</div></div></div>`;
   } else {
-    const EX = SET.eralbl ? 18 : 0;
-    const AX = EX + bands.length*20 + (showGT?70:46); AX_=AX;
+    const FS = SET.fs||1;
+    const EX = SET.eralbl ? Math.round(18*FS) : 0, BW = Math.round(20*FS);
+    const AX = EX + bands.length*BW + Math.round((showGT?70:46)*FS); AX_=AX;
     const maxLen = Math.max(4, ...bars.map(({p})=>[...p.n].length));
-    const HEAD = UI.names ? Math.round(Math.min(360, Math.max(90, maxLen*13.6 + 46 + (bars.some(({p})=>isPeriod(p))?16:0)))) : 26; HEAD_=HEAD;
-    const genV = bands.map((b,bi)=>b.segs.map(g=>segHTML(g, `left:${EX+bi*20+(g.lane==='s'?9:0)}px;`)).join('')).join('');
+    const HEAD = UI.names ? Math.round(Math.min(360*FS, Math.max(90, (maxLen*13.6 + 46 + (bars.some(({p})=>isPeriod(p))?16:0))*FS))) : Math.round(26*FS); HEAD_=HEAD;
+    const genV = bands.map((b,bi)=>b.segs.map(g=>segHTML(g, `left:${EX+bi*BW+(g.lane==='s'?Math.round(9*FS):0)}px;`)).join('')).join('');
     const heads = bars.map(({p})=>`<div class="vhead dh${selected.includes(p.id)?' sel':''}" data-id="${p.id}" title="${esc(p.n)}${p.desc?' — '+esc(p.desc):''}">${handle(p)}<span class="nm">${esc(p.n)}</span>${isPeriod(p)?'<span class="tag">期</span>':''}</div>`).join('');
     const cols = bars.map(({p,g})=>`<div class="col${selected.includes(p.id)?' sel':''}" data-id="${p.id}">${barHTML(p,g)}</div>`).join('');
     const n = Math.max(bars.length,1);
@@ -1364,26 +1404,46 @@ $('#chart').addEventListener('click', ev=>{
 
 /* ---------- 検索 ---------- */
 const q=$('#q'), dd=$('#dd'); let ddItems=[], ddOn=0, searchSeq=0;
+// 候補：{kind:'person', p} か {kind:'event'|'period'|'none', t}
+const TAG={person:'人', event:'できごと・線', period:'期間・帯', none:'年なし'};
 function showDD(items, msg){
   ddItems=items; ddOn=0;
   if(!items.length && !msg){ dd.style.display='none'; return; }
-  dd.innerHTML = items.map((p,i)=>`<div class="it${i===0?' on':''}" data-i="${i}"><b>${esc(p.n)}</b>　${esc(birthTxt(p))}–${p.d!=null?esc(deathTxt(p)):(p.du||p.b<CUR-115?'?':'存命')}<small>${esc(p.desc||'')}</small></div>`).join('')
-    + (msg?`<div class="msg">${esc(msg)}</div>`:'');
+  dd.innerHTML = items.map((r,i)=>{
+    if(r.kind==='person'){ const p=r.p;
+      return `<div class="it${i===0?' on':''}" data-i="${i}"><b>${esc(p.n)}</b>　${esc(birthTxt(p))}–${p.d!=null?esc(deathTxt(p)):(p.du||p.b<CUR-115?'?':'存命')}<span class="tg">人</span><small>${esc(p.desc||'')}</small></div>`; }
+    const x=r.t;
+    return `<div class="it${i===0?' on':''}${x.kind==='none'?' off':''}" data-i="${i}"><b>${esc(x.n)}</b>　${x.a==null?'':esc(fmtY(x.a)+(x.kind==='period'?'–'+(x.open?'':fmtY(x.b)):''))}<span class="tg">${TAG[x.kind]}</span><small>${esc(x.desc)}</small></div>`;
+  }).join('') + (msg?`<div class="msg">${esc(msg)}</div>`:'');
   dd.style.display='block';
+}
+// Wikidataで人も期間もできごともまとめて探す
+async function searchAll(v){
+  const things = await searchThings(v);
+  const need = things.filter(x=>x.kind==='person' && !PEOPLE[x.id]).map(x=>x.id);
+  const ppl = need.length ? await fetchPeople(need) : {};
+  const out=[];
+  for(const x of things){
+    if(x.kind==='person'){ const p=PEOPLE[x.id]||ppl[x.id]; if(p && p.b!=null){ if(!p.desc && x.desc) p.desc=x.desc; out.push({kind:'person', p, n:p.n}); } }
+    else out.push({kind:x.kind, t:x, n:x.n});
+  }
+  // 名前がぴったり → 人 → 期間・できごと → 年なし
+  const rank=r=>(r.n===v?0:10)+({person:0, period:1, event:1, none:5}[r.kind]);
+  return out.map((r,i)=>({r,i})).sort((a,b)=>rank(a.r)-rank(b.r)||a.i-b.i).map(o=>o.r);
 }
 q.addEventListener('input', ()=>{
   const v=q.value.trim(); const seq=++searchSeq;
   if(!v){ showDD([]); return; }
-  const loc = localMatch(v);
+  const loc = localMatch(v).map(p=>({kind:'person', p, n:p.n}));
   showDD(loc, 'Wikidataで探してる…');
   clearTimeout(q._t);
   q._t = setTimeout(async ()=>{
     try{
-      const live = await searchHumans(v);
+      const live = await searchAll(v);
       if(seq!==searchSeq) return;
-      const seen=new Set(loc.map(p=>p.id));
-      const merged = loc.concat(live.filter(p=>!seen.has(p.id))).slice(0,10);
-      showDD(merged, merged.length?'':'見つからない…');
+      const seen=new Set(loc.map(r=>r.p.id));
+      const merged = loc.concat(live.filter(r=>!(r.kind==='person' && seen.has(r.p.id)))).slice(0,12);
+      showDD(merged, merged.length?'':'見つからない…（短くしてみてネ）');
     }catch(e){ if(seq===searchSeq) showDD(loc, 'Wikidataにつながらない（手元のデータだけ表示）'); }
   }, 350);
 });
@@ -1397,7 +1457,8 @@ q.addEventListener('keydown', ev=>{
 });
 dd.addEventListener('mousedown', ev=>{ const it=ev.target.closest('.it'); if(it){ ev.preventDefault(); pick(ddItems[+it.dataset.i]); } });
 q.addEventListener('blur', ()=>setTimeout(()=>showDD([]),150));
-function pick(p){ remember(p); add(p); q.value=''; showDD([]); searchSeq++; }
+function pick(r){ q.value=''; showDD([]); searchSeq++;
+  if(r.kind==='person'){ remember(r.p); add(r.p); } else pickThing(r.t); }
 
 /* ---------- 名前をまとめて探す（4人ずつ同時、途中で止められる） ---------- */
 let runId=0;
@@ -1549,7 +1610,7 @@ async function searchThings(q){
     const id=r.p.value.split('/').pop();
     const o=by[id]||(by[id]={id, n:null, en:null, desc:'', h:false, st:{t:new Map(), s:new Map(), e:new Map()}});
     if(r.jl) o.n=r.jl.value; if(r.el) o.en=r.el.value; if(r.jd) o.desc=r.jd.value; if(r.h) o.h=true;
-    if(r.k && r.s){ const m=o.st[r.k.value]; let x=m.get(r.s.value);
+    if(r.k && r.s && o.st[r.k.value]){ const m=o.st[r.k.value]; let x=m.get(r.s.value);
       if(!x){ x={rank:/Preferred/.test(r.rank?r.rank.value:'')?'p':'n', y:null, prec:null, circa:false}; m.set(r.s.value,x); }
       if(r.t){ const y=parseYear(r.t.value); if(y!=null){ x.y=y; x.prec=r.prec?+r.prec.value:null; } } }
   }
@@ -1566,39 +1627,16 @@ async function searchThings(q){
     return {id:h.id, n:o.n||o.en||h.label||h.id, desc:o.desc||h.description||'', a, b, open, kind};
   }).filter(Boolean);
 }
-const wq=$('#wq'), wdd=$('#wdd'); let wItems=[], wSeq=0;
-function showW(items, msg){
-  wItems=items;
-  if(!items.length && !msg){ wdd.style.display='none'; return; }
-  const tag={event:'できごと・線', period:'期間・帯', person:'人', none:'年なし'};
-  wdd.innerHTML = items.map((x,i)=>`<div class="it${x.kind==='none'?' off':''}" data-i="${i}"><b>${esc(x.n)}</b>　${x.a==null?'':esc(fmtY(x.a)+(x.kind==='period'?'–'+(x.open?'':fmtY(x.b)):''))}<span class="tg">${tag[x.kind]}</span><small>${esc(x.desc)}</small></div>`).join('')
-    + (msg?`<div class="msg">${esc(msg)}</div>`:'');
-  wdd.style.display='block';
-}
-wq.addEventListener('input', ()=>{
-  const v=wq.value.trim(); const seq=++wSeq;
-  if(!v){ showW([]); return; }
-  showW([], 'Wikidataで探してる…');
-  clearTimeout(wq._t);
-  wq._t=setTimeout(async ()=>{
-    try{ const r=await searchThings(v); if(seq!==wSeq) return; showW(r, r.length?'':'見つからない…（短くしてみてネ）'); }
-    catch(e){ if(seq===wSeq) showW([], 'Wikidataにつながらない…'); }
-  }, 350);
-});
-wq.addEventListener('keydown', ev=>{ if(ev.key==='Enter' && wItems[0]){ ev.preventDefault(); pickThing(wItems.find(x=>x.kind!=='none')); } if(ev.key==='Escape') showW([]); });
-wdd.addEventListener('mousedown', ev=>{ const it=ev.target.closest('.it'); if(it){ ev.preventDefault(); pickThing(wItems[+it.dataset.i]); } });
-wq.addEventListener('blur', ()=>setTimeout(()=>showW([]),150));
 async function pickThing(x){
   if(!x) return;
-  if(x.kind==='none'){ manMsg(`「${x.n}」は年が登録されてない…下の欄に手で入れてネ`, true); $('#mName').value=x.n; showW([]); return; }
-  wq.value=''; showW([]); wSeq++;
+  if(x.kind==='none'){ UI.add=true; applyUI(); $('#manBox').open=true; $('#mName').value=x.n; manMsg(`「${x.n}」は年が登録されてない…ここに年を入れてネ`, true); toast('年が登録されてない…手で入れてネ'); $('#mS').focus(); return; }
   if(x.kind==='person'){
     try{ const got=await fetchPeople([x.id]); const p=got[x.id]; if(p && p.b!=null){ remember(p); add(p); manMsg(`「${p.n}」は人だから、人として足した`); } else manMsg('生年が登録されてない人…',true); }
     catch(e){ manMsg('Wikidataにつながらない…',true); }
     return;
   }
   const ev=upsertManual(null, x.n, x.a, x.kind==='event'?null:x.b, x.id);
-  manMsg(`「${x.n}」を追加した（${ev?'できごと・線':'期間・帯'}）${x.open?'。終わりが登録されてないから今年まで':''}。年は一覧の名前を押せばなおせる`);
+  const msg=`「${x.n}」を追加した（${ev?'できごと・線':'期間・帯'}）${x.open?'。終わりが登録されてないから今年まで':''}`; manMsg(msg+'。年は一覧の名前を押せばなおせる'); toast(msg);
   render(); syncURL();
 }
 
@@ -1627,6 +1665,16 @@ $('#morePop').addEventListener('click', ev=>{ if(ev.target.closest('button')) $(
 document.addEventListener('click', ev=>{ if(!ev.target.closest('.menu')) $('#morePop').classList.remove('on'); });
 $('#dataBtn').addEventListener('click', ()=>$('#dataFile').click());
 
+/* ---------- フォント（Google Fonts を使うときだけ読み込む） ---------- */
+const FONT_CSS = {ud:'BIZ+UDPGothic:wght@400;700', min:'Shippori+Mincho:wght@400;700', maru:'Zen+Maru+Gothic:wght@400;700', hand:'Klee+One:wght@400;600'};
+function loadFont(k){
+  if(!FONT_CSS[k] || document.getElementById('gf-'+k)) return;
+  const l=document.createElement('link'); l.id='gf-'+k; l.rel='stylesheet'; l.crossOrigin='anonymous';
+  l.href='https://fonts.googleapis.com/css2?family='+FONT_CSS[k]+'&display=swap';
+  l.onload=()=>{ setTimeout(()=>{ if(geo) render(); }, 60); };    // 字の幅が変わるので、はみ出し判定をやり直す
+  document.head.appendChild(l);
+}
+
 /* ---------- 表示の切り替え ---------- */
 function applySet(){
   document.querySelectorAll('#orient button').forEach(b=>b.classList.toggle('on', b.dataset.o===SET.orient));
@@ -1634,12 +1682,17 @@ function applySet(){
   $('#gmode').value = SET.gmode; $('#theme').value = SET.theme;
   $('#glabel').checked = SET.glabel; $('#eralbl').checked = SET.eralbl; $('#lpos').value = SET.lpos;
   document.documentElement.dataset.theme = SET.theme;
+  document.documentElement.dataset.font = SET.font; loadFont(SET.font);
+  document.documentElement.style.setProperty('--fs', String(SET.fs||1));
+  $('#font').value = SET.font; $('#fs').value = String(SET.fs||1);
   if(READY) lsSet(SET_KEY, SET);   // 共有URLで開いたときの設定は、その人の保存設定に上書きしない
   syncURLSoon();
 }
 $('#orient').addEventListener('click', ev=>{ const b=ev.target.closest('[data-o]'); if(!b) return; SET.orient=b.dataset.o; applySet(); render(); });
 $('#gtick').addEventListener('change', ()=>{ SET.gtick=$('#gtick').checked; applySet(); render(); });
 $('#gband').addEventListener('change', ()=>{ SET.gband=$('#gband').checked; applySet(); render(); });
+$('#font').addEventListener('change', ()=>{ SET.font=$('#font').value; applySet(); render(); });
+$('#fs').addEventListener('change', ()=>{ SET.fs=+$('#fs').value; applySet(); render(); });
 $('#lpos').addEventListener('change', ()=>{ SET.lpos=$('#lpos').value; applySet(); render(); });
 $('#gmode').addEventListener('change', ()=>{ SET.gmode=$('#gmode').value; applySet(); render(); });
 $('#glabel').addEventListener('change', ()=>{ SET.glabel=$('#glabel').checked; applySet(); });
@@ -1647,12 +1700,80 @@ $('#eralbl').addEventListener('change', ()=>{ SET.eralbl=$('#eralbl').checked; a
 $('#theme').addEventListener('change', ()=>{ SET.theme=$('#theme').value; applySet(); render(); });
 $('#sort').addEventListener('change', ()=>{ render(); syncURL(); });
 $('#era').addEventListener('change', ()=>{ render(); syncURLSoon(); });
+function syncTitle(fromH){
+  const t = fromH ? $('#titleH').textContent.trim() : $('#title').value.trim();
+  if(fromH) $('#title').value=t; else if($('#titleH').textContent!==t) $('#titleH').textContent=t;
+  $('#titleH').hidden = !t && document.activeElement!==$('#titleH');
+  document.title = t ? `${t}｜生没年グラフ` : '生没年グラフ';
+}
+$('#titleH').addEventListener('input', ()=>{ syncTitle(true); clearTimeout($('#title')._t); $('#title')._t=setTimeout(syncURL,300); });
+$('#titleH').addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); $('#titleH').blur(); } });
+$('#titleH').addEventListener('blur', ()=>syncTitle(true));
+$('#title').addEventListener('input', ()=>syncTitle(false));
 $('#title').addEventListener('input', ()=>{ clearTimeout($('#title')._t); $('#title')._t=setTimeout(syncURL,300); });
 $('#clear').addEventListener('click', ()=>{ runId++; list.filter(id=>/^M/.test(id)).forEach(id=>delete PEOPLE[id]);
   list=[]; events=[]; selected=[]; colorIdx={}; nextColor=0; render(); syncURL(); });
 $('#share').addEventListener('click', async ()=>{
   await syncURL();
   try{ await navigator.clipboard.writeText(location.href); toast('URLコピーした！'); }catch(e){ prompt('このURLを共有',location.href); }
+});
+
+/* ---------- 画像で保存・コピー ---------- */
+let shotLib=null;
+function loadShotLib(){
+  if(window.htmlToImage) return Promise.resolve();
+  if(shotLib) return shotLib;
+  shotLib=new Promise((res,rej)=>{ const sc=document.createElement('script');
+    sc.src='https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js';
+    sc.onload=res; sc.onerror=()=>{ shotLib=null; rej(new Error('画像の道具が読み込めない')); }; document.head.appendChild(sc); });
+  return shotLib;
+}
+const nextFrame=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+async function makeShot(mode){
+  if(!geo){ toast('まだ何も並んでない…'); return null; }
+  toast('画像を作ってる…');
+  await loadShotLib();
+  const v=viewInfo(); const keepZ=ZOOM, keepC=v?v.center:null;
+  if(mode==='view' && v && ZOOM>1.01) RANGE={min:geo.min + v.pos/v.len*v.span, max:geo.min + Math.min(v.len, v.pos+v.vis)/v.len*v.span};
+  ZOOM=1;
+  const cap=$('#cap'); cap.classList.add('capturing');
+  const t=$('#title').value.trim();
+  $('#credit').textContent=`生没年グラフ ｜ データ：Wikidata（CC0）ほか ｜ ${new Date().toLocaleDateString('ja-JP')}`;
+  hideCursor(); hidePop(); hideEvPop();
+  let blob=null;
+  try{
+    render(); await nextFrame(); fitLabels(); fitSegs(); onScroll(); hideCursor();
+    if(document.fonts && document.fonts.ready) await document.fonts.ready;
+    const sc=cap.querySelector('.vscroll,.hscroll');
+    const extra = sc ? Math.max(0, sc.scrollWidth - sc.clientWidth) : 0;   // 縦表示で横にはみ出してるぶん
+    if(extra) cap.style.width = (cap.offsetWidth + extra + 4)+'px';
+    await nextFrame();
+    const bg=getComputedStyle(document.body).backgroundColor;
+    blob = await htmlToImage.toBlob(cap, {pixelRatio:2, backgroundColor:bg, width:cap.offsetWidth, height:cap.offsetHeight,
+      filter:n=>!(n.classList && (n.classList.contains('cyear')||n.classList.contains('cline')||n.classList.contains('age')))});
+  } finally {
+    cap.classList.remove('capturing'); cap.style.width=''; RANGE=null; ZOOM=keepZ; if(keepC!=null) pendingAnchor={y:keepC, f:.5}; render();
+  }
+  return blob;
+}
+function shotName(){ const t=new Date(), ymd=`${t.getFullYear()}${String(t.getMonth()+1).padStart(2,'0')}${String(t.getDate()).padStart(2,'0')}`;
+  return (($('#title').value.trim()||'生没年グラフ').replace(/[\\/:*?"<>|]/g,'_'))+'_'+ymd+'.png'; }
+async function shotSave(mode){
+  try{ const blob=await makeShot(mode); if(!blob) return;
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=shotName(); document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),3000); toast('画像を保存した！'); }
+  catch(e){ toast('画像が作れなかった…（'+e.message+'）'); }
+}
+$('#shotSaveV').addEventListener('click', ()=>shotSave('view'));
+$('#shotSaveA').addEventListener('click', ()=>shotSave('all'));
+$('#shotCopyV').addEventListener('click', async ()=>{
+  try{
+    if(!navigator.clipboard || typeof ClipboardItem==='undefined') throw new Error('このぶらうざは画像のコピーができない');
+    // Safari向け：くりっくしたその場で ClipboardItem を作って、中身はあとから
+    const p=makeShot('view').then(b=>{ if(!b) throw new Error('まだ何も並んでない'); return b; });
+    await navigator.clipboard.write([new ClipboardItem({'image/png': p})]);
+    toast('画像をコピーした！ そのまま貼りつけられる');
+  }catch(e){ toast('コピーできなかった…（'+e.message+'）。「画像で保存」を使ってネ'); }
 });
 
 /* ---------- 表示の保存・読み込み ---------- */
@@ -1684,9 +1805,9 @@ $('#loadFile').addEventListener('change', async ev=>{
     list=(d.order||[]).filter(id=>PEOPLE[id]); selected=(d.selected||[]).filter(id=>list.includes(id));
     colorIdx={}; nextColor=0;
     const s=d.settings||{};
-    Object.assign(SET, {orient:s.orient||'h', gtick:!!s.gtick, gband:!!s.gband, gmode:s.gmode||'jp', theme:s.theme||SET.theme, glabel:s.glabel!==false, eralbl:s.eralbl!==false, lpos:s.lpos||'in'});
+    Object.assign(SET, {orient:s.orient||'h', gtick:!!s.gtick, gband:!!s.gband, gmode:s.gmode||'jp', theme:s.theme||SET.theme, glabel:s.glabel!==false, eralbl:s.eralbl!==false, lpos:s.lpos||'in', font:s.font||SET.font, fs:s.fs||1});
     if(s.sort) $('#sort').value=s.sort; if(s.era) $('#era').value=s.era;
-    $('#title').value=d.title||'';
+    $('#title').value=d.title||''; syncTitle(false);
     applySet(); render(); syncURL(); toast('読み込んだ！');
   }catch(e){ toast('このファイルは読めない…（保存ボタンで作ったファイルを選んでネ）'); }
 });
@@ -1716,7 +1837,7 @@ $('#dataFile').addEventListener('change', async ev=>{
       if(ids.length){ await ensureIds(ids); ids.forEach(id=>add(PEOPLE[id],true)); }
       selected=(o.s||[]).map(i=>list[i]).filter(Boolean).slice(0,2);
       if(o.z>1 && Number.isFinite(o.c)){ ZOOM=o.z; pendingAnchor={y:o.c, f:.5}; }
-      render(); READY=true; syncURL(); return;
+      render(); syncTitle(false); READY=true; syncURL(); return;
     }catch(e){ toast('共有URLが読めなかった…'); }
   }
   readManualParam(sp.get('m'));
@@ -1728,7 +1849,7 @@ $('#dataFile').addEventListener('change', async ev=>{
   selected = (sp.get('sel')||'').split(',').filter(id=>list.includes(id)).slice(0,2);
   const z=+sp.get('z'), c=+sp.get('c');
   if(z>1 && Number.isFinite(c) && sp.get('c')!==null){ ZOOM=z; pendingAnchor={y:c, f:.5}; }
-  render();
+  render(); syncTitle(false);
   READY=true; syncURL();
 })();
 </script>
