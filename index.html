@@ -255,7 +255,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.16</span><span class="lbl" id="dataStat"></span></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.17</span><span class="lbl" id="dataStat"></span></header>
 <div class="wrap">
 
   <div class="panel">
@@ -689,7 +689,7 @@ async function sparql(q){
 //  b/d = 生年/没年（いちばん早い方）、b2/d2 = 幅があるときの遅い方
 //  bc/dc = 「頃」、bv/dv = 表示用の説の一覧、du = 没年「不明」と登録、f/f2 = 活動時期
 const WD_CIRCA='Q5727902';
-const PFIELDS=['b','b2','bc','bv','d','d2','dc','dv','du','f','f2'];
+const PFIELDS=['b','b2','bc','bv','bq','d','d2','dc','dv','dq','du','f','f2'];
 function yearRange(y, prec){
   if(prec==null||prec>=9) return [y,y];
   if(prec===8){ const lo=Math.floor(y/10)*10; return [lo,lo+9]; }
@@ -707,30 +707,34 @@ function yearLabel(y, prec, circa){
 }
 function summarize(list){
   if(!list||!list.length) return null;
-  const pref=list.filter(s=>s.rank==='p'); const use=pref.length?pref:list;
-  const known=use.filter(s=>s.y!=null);
-  if(!known.length) return {unknown:true};
+  // 推奨 → ふつう → （それしかなければ）非推奨、の順で使う
+  const ok=list.filter(s=>s.y!=null);
+  const pref=ok.filter(s=>s.rank==='p'), norm=ok.filter(s=>s.rank==='n'), dep=ok.filter(s=>s.rank==='d');
+  const known = pref.length ? pref : norm.length ? norm : dep;
+  const isDep = !pref.length && !norm.length && dep.length>0;
+  if(!known.length) return list.some(s=>s.rank!=='d') ? {unknown:true} : null;
   let lo=Infinity, hi=-Infinity, circa=false; const labels=[];
   for(const s of known){
     const [a,b]=yearRange(s.y,s.prec); lo=Math.min(lo,a); hi=Math.max(hi,b);
     if(s.circa || (s.prec!=null && s.prec<6)) circa=true;
     const L=yearLabel(s.y,s.prec,s.circa); if(!labels.includes(L)) labels.push(L);
   }
+  if(isDep) circa=true;      // 疑わしい年なので、はしをぼかす
   const out={lo,hi,circa};
-  if(labels.length>1 || circa || hi>lo) out.labels=labels;
+  if(isDep) out.dep=true;
+  if(labels.length>1 || circa || hi>lo) out.labels=isDep ? labels.map(l=>/頃|年代|世紀/.test(l)?l:l+'頃') : labels;
   return out;
 }
 function peopleQuery(chunk){
   return `SELECT ?p ?sl ?jl ?el ?jd ?k ?s ?rank ?t ?prec ?circa WHERE {
   VALUES ?p { ${chunk.map(x=>'wd:'+x).join(' ')} }
-  ?p wdt:P31 wd:Q5 .
   OPTIONAL { ?p wikibase:sitelinks ?sl }
   OPTIONAL { ?p rdfs:label ?jl FILTER(LANG(?jl)="ja") }
   OPTIONAL { ?p rdfs:label ?el FILTER(LANG(?el)="en") }
   OPTIONAL { ?p schema:description ?jd FILTER(LANG(?jd)="ja") }
   OPTIONAL {
     VALUES (?k ?pp ?psv) { ("b" p:P569 psv:P569) ("d" p:P570 psv:P570) ("f" p:P1317 psv:P1317) ("f" p:P2031 psv:P2031) ("f" p:P2032 psv:P2032) }
-    ?p ?pp ?s . ?s wikibase:rank ?rank . FILTER(?rank != wikibase:DeprecatedRank)
+    ?p ?pp ?s . ?s wikibase:rank ?rank .
     OPTIONAL { ?s ?psv ?v . ?v wikibase:timeValue ?t ; wikibase:timePrecision ?prec . }
     OPTIONAL { ?s pq:P1480 ?circa }
   }
@@ -744,7 +748,7 @@ function digestPeople(rows, out){
     if(r.sl) o.links=+r.sl.value;
     if(r.k && r.s){
       const m=o._st[r.k.value]; let st=m.get(r.s.value);
-      if(!st){ st={rank:/Preferred/.test(r.rank?r.rank.value:'')?'p':'n', y:null, prec:null, circa:false}; m.set(r.s.value,st); }
+      if(!st){ const rk=r.rank?r.rank.value:''; st={rank:/Preferred/.test(rk)?'p':/Deprecated/.test(rk)?'d':'n', y:null, prec:null, circa:false}; m.set(r.s.value,st); }
       if(r.t){ const y=parseYear(r.t.value); if(y!=null){ st.y=y; st.prec=r.prec?+r.prec.value:null; } }
       if(r.circa && r.circa.value.endsWith(WD_CIRCA)) st.circa=true;
     }
@@ -753,8 +757,8 @@ function digestPeople(rows, out){
 function finishPerson(o){
   const B=summarize([...o._st.b.values()]), D=summarize([...o._st.d.values()]), F=summarize([...o._st.f.values()]);
   const p={id:o.id, n:o.n||o._en||o.id, desc:o.desc, links:o.links, b:null, d:null};
-  if(B && !B.unknown){ p.b=B.lo; if(B.hi>B.lo) p.b2=B.hi; if(B.circa) p.bc=1; if(B.labels) p.bv=B.labels; }
-  if(D && !D.unknown){ p.d=D.lo; if(D.hi>D.lo) p.d2=D.hi; if(D.circa) p.dc=1; if(D.labels) p.dv=D.labels; }
+  if(B && !B.unknown){ p.b=B.lo; if(B.hi>B.lo) p.b2=B.hi; if(B.circa) p.bc=1; if(B.labels) p.bv=B.labels; if(B.dep) p.bq=1; }
+  if(D && !D.unknown){ p.d=D.lo; if(D.hi>D.lo) p.d2=D.hi; if(D.circa) p.dc=1; if(D.labels) p.dv=D.labels; if(D.dep) p.dq=1; }
   if(D && D.unknown) p.du=1;
   if(F && !F.unknown){ p.f=F.lo; if(F.hi>F.lo) p.f2=F.hi; }
   return p;
@@ -783,6 +787,8 @@ function noteOf(p){
   const a=[];
   if(p.bv && p.bv.length>1) a.push('生年 諸説：'+p.bv.join('・'));
   if(p.dv && p.dv.length>1) a.push('没年 諸説：'+p.dv.join('・'));
+  if(p.bq) a.push('生年：Wikidataでは「疑わしい」とされてる年');
+  if(p.dq) a.push('没年：Wikidataでは「疑わしい」とされてる年');
   if(p.du) a.push('没年 不明');
   if(p.f!=null) a.push('活動時期：'+yearLabel(p.f,9)+(p.f2!=null?'〜'+yearLabel(p.f2,9):''));
   return a.join(' ／ ');
@@ -1622,8 +1628,8 @@ function thingsQuery(ids){
   OPTIONAL { ?p schema:description ?jd FILTER(LANG(?jd)="ja") }
   OPTIONAL { ?p wdt:P31 wd:Q5 . BIND(1 AS ?h) }
   OPTIONAL {
-    VALUES (?k ?pp ?psv) { ("t" p:P585 psv:P585) ("s" p:P580 psv:P580) ("e" p:P582 psv:P582) ("s" p:P571 psv:P571) ("e" p:P576 psv:P576) }
-    ?p ?pp ?s . ?s wikibase:rank ?rank . FILTER(?rank != wikibase:DeprecatedRank)
+    VALUES (?k ?pp ?psv) { ("t" p:P585 psv:P585) ("s" p:P580 psv:P580) ("e" p:P582 psv:P582) ("s" p:P571 psv:P571) ("e" p:P576 psv:P576) ("b" p:P569 psv:P569) }
+    ?p ?pp ?s . ?s wikibase:rank ?rank .
     OPTIONAL { ?s ?psv ?v . ?v wikibase:timeValue ?t ; wikibase:timePrecision ?prec . }
   }
 }`;
@@ -1634,10 +1640,10 @@ async function searchThings(q){
   const by={};
   for(const r of rows){
     const id=r.p.value.split('/').pop();
-    const o=by[id]||(by[id]={id, n:null, en:null, desc:'', h:false, st:{t:new Map(), s:new Map(), e:new Map()}});
+    const o=by[id]||(by[id]={id, n:null, en:null, desc:'', h:false, st:{t:new Map(), s:new Map(), e:new Map(), b:new Map()}});
     if(r.jl) o.n=r.jl.value; if(r.el) o.en=r.el.value; if(r.jd) o.desc=r.jd.value; if(r.h) o.h=true;
     if(r.k && r.s && o.st[r.k.value]){ const m=o.st[r.k.value]; let x=m.get(r.s.value);
-      if(!x){ x={rank:/Preferred/.test(r.rank?r.rank.value:'')?'p':'n', y:null, prec:null, circa:false}; m.set(r.s.value,x); }
+      if(!x){ const rk=r.rank?r.rank.value:''; x={rank:/Preferred/.test(rk)?'p':/Deprecated/.test(rk)?'d':'n', y:null, prec:null, circa:false}; m.set(r.s.value,x); }
       if(r.t){ const y=parseYear(r.t.value); if(y!=null){ x.y=y; x.prec=r.prec?+r.prec.value:null; } } }
   }
   return hits.map(h=>{
@@ -1649,7 +1655,8 @@ async function searchThings(q){
     else if(ok(T)){ a=T.lo; b=T.hi; if(ok(E)) b=E.hi; }
     else if(ok(E)){ a=E.lo; b=E.hi; }
     if(open) b=CUR;        // 終わりがない（今も続いてる国など）は今年まで
-    const kind = o.h ? 'person' : a==null ? 'none' : (b==null||b===a) ? 'event' : 'period';
+    const hasBirth = [...o.st.b.values()].some(x=>x.y!=null);
+    const kind = (o.h || hasBirth) ? 'person' : a==null ? 'none' : (b==null||b===a) ? 'event' : 'period';
     return {id:h.id, n:o.n||o.en||h.label||h.id, desc:o.desc||h.description||'', a, b, open, kind};
   }).filter(Boolean);
 }
