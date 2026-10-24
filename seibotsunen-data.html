@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>生没年データ作成</title>
+<style>
+:root{--bg:#f6f3ec;--panel:#fffdf8;--ink:#23211d;--sub:#7a746a;--line:#e2ddd2;--accent:#c8553d;--ok:#3d8a5a;--ng:#c0392b}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1d20;--panel:#25262a;--ink:#ecebe7;--sub:#9a978f;--line:#393a3f;--accent:#ff7d5e;--ok:#6cc08b;--ng:#ff6b5b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,"Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;font-size:14px}
+.wrap{max-width:1100px;margin:0 auto;padding:14px 16px 40px}
+h1{font-size:20px;margin:0 0 4px}
+h2{font-size:16px;margin:22px 0 8px;border-left:4px solid var(--accent);padding-left:8px}
+.note{color:var(--sub);font-size:12.5px;line-height:1.7}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.ctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input[type=text],input[type=number],textarea,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:5px 8px}
+textarea{width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;min-height:200px}
+button{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:5px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+.cat-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.cat-head b{font-size:15px;min-width:13em}
+.st{font-size:12px;color:var(--sub)}
+.st.ok{color:var(--ok)} .st.ng{color:var(--ng)}
+details summary{cursor:pointer;color:var(--sub);font-size:12.5px;margin-top:6px}
+.tbl{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:6px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:4px 7px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{position:sticky;top:0;background:var(--panel);z-index:1}
+th[data-sort]{cursor:pointer;user-select:none}
+th[data-sort]:hover{color:var(--accent)}
+th .ar{color:var(--accent);font-size:10px}
+td.desc{white-space:normal;color:var(--sub);min-width:14em}
+tr.off td{opacity:.4}
+a{color:var(--accent)}
+.sbox{position:relative;display:inline-block}
+.dd{position:absolute;left:0;top:100%;min-width:320px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.15);z-index:10;max-height:300px;overflow:auto}
+.dd div{padding:6px 9px;cursor:pointer;border-bottom:1px solid var(--line)}
+.dd div:hover{background:var(--bg)}
+.dd small{color:var(--sub);display:block}
+.pre-res{margin-top:6px;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:5px}
+.pre-res .r{display:flex;gap:6px;align-items:center;font-size:12.5px}
+.pre-res select{flex:1;min-width:0;font-size:12px}
+.pre-res .miss{color:var(--ng)}
+.mode{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:13px}
+.catbox{margin-top:6px}
+.catbox textarea{min-height:64px;font-size:12.5px}
+.catbox .ctrl{margin-top:4px}
+.bar{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>生没年データ作成 <span class="note">v0.8</span></h1>
+  <div class="note">
+    分野ごとにWikidataから有名人を取ってくる → いらない人のチェック外す・足りない人を足す → 一番下の「JSON書き出し」。<br>
+    出てきた <b>seibotsunen-data.json</b> を、生没年グラフのHTMLと同じフォルダに置けばOK。<br>
+    「有名さ」＝何か国語のWikipediaに記事があるか（数字が大きいほど有名）。作業内容はこのブラウザに自動保存。<br>
+    集め方は2つ：<b>カテゴリから</b>（Wikipediaのカテゴリに入ってる人だけ。本業がはっきりする）／<b>職業から</b>（Wikidataの職業欄。万能な人が混ざりやすい）。
+  </div>
+
+  <h2>分野</h2>
+  <div class="ctrl" style="margin-bottom:8px">
+    <button id="connTest">接続テスト</button>
+    <button class="primary" id="fetchAll">全部まとめて取得</button>
+    <button id="keepAll">全分野：上位400人を採用</button>
+    <span class="st" id="allSt"></span>
+  </div>
+  <div id="cats"></div>
+
+  <h2>プリセット</h2>
+  <div class="note">1行に1人。「解決」でWikidataの人物に結びつける。違う人になってたら横のメニューで選び直す。</div>
+  <div class="ctrl" style="margin:6px 0">
+    <button id="resolveAll">全部解決</button>
+    <button id="addPreset">プリセット追加</button>
+    <span class="st" id="preSt"></span>
+  </div>
+  <div id="presets"></div>
+</div>
+
+<div class="bar">
+  <button class="primary" id="export">JSON書き出し</button>
+  <label class="note">続きから：<input type="file" id="importFile" accept=".json"></label>
+  <button id="reset">最初からやり直す</button>
+  <span class="st" id="sumSt"></span>
+</div>
+
+<script>
+'use strict';
+const WD_API='https://www.wikidata.org/w/api.php';
+const WD_SPARQL='https://query.wikidata.org/sparql';
+const SAVE_KEY='sbg_builder_v2';
+const KEEP=400;
+const DEF_EX='作品|楽曲|一覧|アルバム|シングル|画像|テンプレート|スタブ|登場人物|架空|題材|映画|ドラマ|ゲーム|曲目';
+
+// 分野の定義（occ = 職業P106のQID）
+const CAT_DEFS = [
+  {id:'jp-bushou',  name:'戦国武将', occ:['Q38142','Q47064','Q189290','Q1402561','Q82955'], region:'jp', minLinks:5, bmin:1400, bmax:1615,
+     mode:'cat', cats:['Category:戦国武将','Category:戦国大名'], depth:2},
+  {id:'jp-seiji',   name:'日本の近現代の政治家', occ:['Q82955'], region:'jp', minLinks:8, bmin:1830},
+  {id:'w-seiji',    name:'世界の王・皇帝・政治家', occ:['Q82955','Q116','Q1402561'], region:'world', minLinks:70},
+  {id:'jp-sakka',   name:'作家・詩人（日本）', occ:['Q36180','Q49757','Q6625963'], region:'jp', minLinks:5,
+     mode:'cat', cats:['Category:日本の小説家','Category:日本の詩人','Category:日本の歌人','Category:日本の俳人'], depth:2},
+  {id:'w-sakka',    name:'作家・詩人（世界）', occ:['Q36180','Q49757','Q6625963'], region:'world', minLinks:50},
+  {id:'gaka',       name:'画家・芸術家', occ:['Q1028181','Q1281618','Q483501'], region:'', minLinks:40},
+  {id:'ongaku',     name:'音楽家・作曲家', occ:['Q36834','Q639669','Q486748','Q158852'], region:'', minLinks:40,
+     mode:'cat', cats:['Category:クラシック音楽の作曲家'], depth:2},
+  {id:'kagaku',     name:'科学者・発明家', occ:['Q901','Q169470','Q593644','Q170790','Q864503','Q11063','Q205375'], region:'', minLinks:40},
+  {id:'tetsugaku',  name:'哲学者・思想家・宗教家', occ:['Q4964182','Q1234713','Q15995642','Q733786','Q42603'], region:'', minLinks:30},
+  {id:'tanken',     name:'探検家・冒険家', occ:['Q11900058','Q9149093','Q11631','Q2095549'], region:'', minLinks:15,
+     mode:'cat', cats:['Category:探検家'], depth:2},
+  {id:'sports',     name:'スポーツ選手', occ:['Q2066131','Q937857','Q10871364','Q3665646','Q10833314','Q11338576'], region:'', minLinks:60},
+  {id:'geinou',     name:'芸能人・映画人', occ:['Q33999','Q2526255','Q245068','Q177220'], region:'', minLinks:70},
+];
+
+const PRESET_DEFS = [
+  {name:'戦国三英傑とまわり', names:['織田信長','豊臣秀吉','徳川家康','武田信玄','上杉謙信','伊達政宗','明智光秀','今川義元','毛利元就','石田三成','真田信繁','北条氏康']},
+  {name:'幕末・明治維新', names:['坂本龍馬','西郷隆盛','大久保利通','木戸孝允','勝海舟','徳川慶喜','吉田松陰','高杉晋作','近藤勇','土方歳三','岩倉具視','伊藤博文']},
+  {name:'お札の人', names:['聖徳太子','紫式部','岩倉具視','伊藤博文','夏目漱石','新渡戸稲造','福澤諭吉','樋口一葉','野口英世','渋沢栄一','津田梅子','北里柴三郎']},
+  {name:'明治〜昭和の文豪', names:['夏目漱石','森鷗外','樋口一葉','与謝野晶子','志賀直哉','谷崎潤一郎','芥川龍之介','宮沢賢治','川端康成','太宰治','中島敦','三島由紀夫']},
+  {name:'クラシック作曲家', names:['アントニオ・ヴィヴァルディ','ヨハン・ゼバスティアン・バッハ','ゲオルク・フリードリヒ・ヘンデル','フランツ・ヨーゼフ・ハイドン','ヴォルフガング・アマデウス・モーツァルト','ルートヴィヒ・ヴァン・ベートーヴェン','フランツ・シューベルト','フレデリック・ショパン','ロベルト・シューマン','フランツ・リスト','ヨハネス・ブラームス','ピョートル・チャイコフスキー','グスタフ・マーラー','クロード・ドビュッシー']},
+  {name:'ルネサンスの巨匠', names:['ヤン・ファン・エイク','フィリッポ・ブルネレスキ','ドナテッロ','サンドロ・ボッティチェッリ','レオナルド・ダ・ヴィンチ','アルブレヒト・デューラー','ミケランジェロ・ブオナローティ','ラファエロ・サンティ','ティツィアーノ・ヴェチェッリオ','ピーテル・ブリューゲル']},
+  {name:'科学の巨人', names:['ガリレオ・ガリレイ','ヨハネス・ケプラー','アイザック・ニュートン','マイケル・ファラデー','チャールズ・ダーウィン','トーマス・エジソン','ニコラ・テスラ','マリ・キュリー','野口英世','アルベルト・アインシュタイン','湯川秀樹','スティーヴン・ホーキング']},
+  {name:'古代の思想家', names:['ピタゴラス','老子','孔子','釈迦','ソクラテス','墨子','プラトン','孟子','荘子','アリストテレス']},
+  {name:'えっ同じ時代！？', names:['徳川家康','ウィリアム・シェイクスピア','ガリレオ・ガリレイ','伊能忠敬','ジョージ・ワシントン','葛飾北斎','ルートヴィヒ・ヴァン・ベートーヴェン','ナポレオン・ボナパルト','エイブラハム・リンカーン','チャールズ・ダーウィン','坂本龍馬']},
+  {name:'歴代総理大臣', names:['伊藤博文','黒田清隆','山縣有朋','松方正義','大隈重信','桂太郎','西園寺公望','原敬','高橋是清','加藤高明','犬養毅','東條英機','吉田茂','岸信介','池田勇人','佐藤栄作','田中角栄','中曽根康弘','小泉純一郎','安倍晋三']},
+];
+
+/* ---------- 小物 ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtY=y=>y==null?'':(y<=0?'前'+(1-y):String(y));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+// 入力欄の年 → 天文年（「前500」「紀元前500」「-500」＝紀元前500年）
+function inYear(t){ t=String(t??'').trim().replace(/年$/,''); if(!t) return null;
+  const m=/^(紀元前|前|BC|-)\s*(\d+)$/i.exec(t); if(m) return 1-parseInt(m[2],10);
+  return /^\d+$/.test(t) ? parseInt(t,10) : NaN; }
+const outYear=y=>y==null?'':(y<=0?'前'+(1-y):String(y));
+function parseYear(v){const m=/^(-?)(\d+)-/.exec(v||'');if(!m)return null;return (m[1]?-1:1)*parseInt(m[2],10);}
+
+async function sparql(q){
+  let r;
+  try{ r=await fetch(WD_SPARQL+'?format=json&query='+encodeURIComponent(q)); }
+  catch(e){ throw new Error('応答なし（時間切れ・混雑だとこう見える）'); }
+  if(!r.ok){ const t=await r.text().catch(()=> ''); throw new Error(r.status+(/timeout|TimeoutException/i.test(t)?'（時間切れ）':r.status==429?'（回数制限）':'')); }
+  return (await r.json()).results.bindings;
+}
+async function wdSearch(q){
+  const u=WD_API+'?action=wbsearchentities&format=json&origin=*&type=item&limit=8&language=ja&uselang=ja&search='+encodeURIComponent(q);
+  return ((await (await fetch(u)).json()).search)||[];
+}
+/* ---------- 人物の詳しい取得（精度・頃・諸説・不明・活動時期） ---------- */
+// 1人ぶんの形：{id,n,desc,links, b,b2,bc,bv, d,d2,dc,dv,du, f,f2}
+//  b/d = 生年/没年（いちばん早い方）、b2/d2 = 幅があるときの遅い方
+//  bc/dc = 「頃」、bv/dv = 表示用の説の一覧、du = 没年「不明」と登録、f/f2 = 活動時期
+const WD_CIRCA='Q5727902';
+const PFIELDS=['b','b2','bc','bv','d','d2','dc','dv','du','f','f2'];
+function yearRange(y, prec){
+  if(prec==null||prec>=9) return [y,y];
+  if(prec===8){ const lo=Math.floor(y/10)*10; return [lo,lo+9]; }
+  if(prec===7){ const c=Math.floor((y-1)/100); return [c*100+1,c*100+100]; }
+  if(prec===6){ const m=Math.floor((y-1)/1000); return [m*1000+1,m*1000+1000]; }
+  return [y,y];
+}
+function yearLabel(y, prec, circa){
+  const Y=v=>v<=0?'前'+(1-v):String(v);
+  if(prec===8 && y>0) return Math.floor(y/10)*10+'年代';
+  if(prec===7){ const c=Math.floor((y-1)/100)+1; return (c<=0?'前'+(1-c):c)+'世紀'; }
+  if(prec===6){ const m=Math.floor((y-1)/1000)+1; return (m<=0?'前'+(1-m):m)+'千年紀'; }
+  if(prec!=null && prec<9) return Y(y)+'頃';
+  return Y(y)+(circa?'頃':'');
+}
+function summarize(list){
+  if(!list||!list.length) return null;
+  const pref=list.filter(s=>s.rank==='p'); const use=pref.length?pref:list;
+  const known=use.filter(s=>s.y!=null);
+  if(!known.length) return {unknown:true};
+  let lo=Infinity, hi=-Infinity, circa=false; const labels=[];
+  for(const s of known){
+    const [a,b]=yearRange(s.y,s.prec); lo=Math.min(lo,a); hi=Math.max(hi,b);
+    if(s.circa || (s.prec!=null && s.prec<6)) circa=true;
+    const L=yearLabel(s.y,s.prec,s.circa); if(!labels.includes(L)) labels.push(L);
+  }
+  const out={lo,hi,circa};
+  if(labels.length>1 || circa || hi>lo) out.labels=labels;
+  return out;
+}
+function peopleQuery(chunk){
+  return `SELECT ?p ?sl ?jl ?el ?jd ?k ?s ?rank ?t ?prec ?circa WHERE {
+  VALUES ?p { ${chunk.map(x=>'wd:'+x).join(' ')} }
+  ?p wdt:P31 wd:Q5 .
+  OPTIONAL { ?p wikibase:sitelinks ?sl }
+  OPTIONAL { ?p rdfs:label ?jl FILTER(LANG(?jl)="ja") }
+  OPTIONAL { ?p rdfs:label ?el FILTER(LANG(?el)="en") }
+  OPTIONAL { ?p schema:description ?jd FILTER(LANG(?jd)="ja") }
+  OPTIONAL {
+    VALUES (?k ?pp ?psv) { ("b" p:P569 psv:P569) ("d" p:P570 psv:P570) ("f" p:P1317 psv:P1317) ("f" p:P2031 psv:P2031) ("f" p:P2032 psv:P2032) }
+    ?p ?pp ?s . ?s wikibase:rank ?rank . FILTER(?rank != wikibase:DeprecatedRank)
+    OPTIONAL { ?s ?psv ?v . ?v wikibase:timeValue ?t ; wikibase:timePrecision ?prec . }
+    OPTIONAL { ?s pq:P1480 ?circa }
+  }
+}`;
+}
+function digestPeople(rows, out){
+  for(const r of rows){
+    const id=r.p.value.split('/').pop();
+    const o=out[id]||(out[id]={id,n:null,desc:'',links:null,_en:null,_st:{b:new Map(),d:new Map(),f:new Map()}});
+    if(r.jl) o.n=r.jl.value; if(r.el) o._en=r.el.value; if(r.jd) o.desc=r.jd.value;
+    if(r.sl) o.links=+r.sl.value;
+    if(r.k && r.s){
+      const m=o._st[r.k.value]; let st=m.get(r.s.value);
+      if(!st){ st={rank:/Preferred/.test(r.rank?r.rank.value:'')?'p':'n', y:null, prec:null, circa:false}; m.set(r.s.value,st); }
+      if(r.t){ const y=parseYear(r.t.value); if(y!=null){ st.y=y; st.prec=r.prec?+r.prec.value:null; } }
+      if(r.circa && r.circa.value.endsWith(WD_CIRCA)) st.circa=true;
+    }
+  }
+}
+function finishPerson(o){
+  const B=summarize([...o._st.b.values()]), D=summarize([...o._st.d.values()]), F=summarize([...o._st.f.values()]);
+  const p={id:o.id, n:o.n||o._en||o.id, desc:o.desc, links:o.links, b:null, d:null};
+  if(B && !B.unknown){ p.b=B.lo; if(B.hi>B.lo) p.b2=B.hi; if(B.circa) p.bc=1; if(B.labels) p.bv=B.labels; }
+  if(D && !D.unknown){ p.d=D.lo; if(D.hi>D.lo) p.d2=D.hi; if(D.circa) p.dc=1; if(D.labels) p.dv=D.labels; }
+  if(D && D.unknown) p.du=1;
+  if(F && !F.unknown){ p.f=F.lo; if(F.hi>F.lo) p.f2=F.hi; }
+  return p;
+}
+// id の配列 → 人物情報（人間だけ）
+async function fetchPeople(ids, size=80, prog){
+  const out={};
+  for(let i=0;i<ids.length;i+=size){
+    if(prog) prog(i, ids.length);
+    if(i) await sleep(250);
+    digestPeople(await sparql(peopleQuery(ids.slice(i,i+size))), out);
+  }
+  const res={}; for(const id in out) res[id]=finishPerson(out[id]);
+  return res;
+}
+function pickFields(p){ const o={id:p.id, n:p.n, desc:p.desc||''}; for(const k of PFIELDS) if(p[k]!=null) o[k]=p[k]; if(o.d===undefined) o.d=null; return o; }
+// 表示用
+const midB=p=>Math.round((p.b+(p.b2??p.b))/2);
+const midD=p=>Math.round((p.d+(p.d2??p.d))/2);
+const fuzzB=p=>p.b2!=null||!!p.bc;
+const fuzzD=p=>p.d2!=null||!!p.dc;
+function txtOf(v, mid, list){ if(list && list.length===1) return list[0]; if(list && list.length>1) return yearLabel(mid,9,true); return v<=0?'前'+(1-v):String(v); }
+const birthTxt=p=>p.b==null?'':txtOf(p.b, midB(p), p.bv);
+const deathTxt=p=>p.d==null?(p.du?'不明':''):txtOf(p.d, midD(p), p.dv);
+function noteOf(p){
+  const a=[];
+  if(p.bv && p.bv.length>1) a.push('生年 諸説：'+p.bv.join('・'));
+  if(p.dv && p.dv.length>1) a.push('没年 諸説：'+p.dv.join('・'));
+  if(p.du) a.push('没年 不明');
+  if(p.f!=null) a.push('活動時期：'+yearLabel(p.f,9)+(p.f2!=null?'〜'+yearLabel(p.f2,9):''));
+  return a.join(' ／ ');
+}
+
+async function wpApi(host, params){
+  const u=`https://${host}/w/api.php?`+new URLSearchParams({...params, format:'json', origin:'*'});
+  let r; try{ r=await fetch(u); }catch(e){ throw new Error('Wikipediaにつながらない'); }
+  if(!r.ok) throw new Error('Wikipedia '+r.status);
+  return r.json();
+}
+// 「URL」「Category:名前」「名前」どれでもOK
+function parseCat(line){
+  line=line.trim(); if(!line) return null;
+  let host='ja.wikipedia.org', title=line;
+  const m=/^https?:\/\/([^\/]+)\/wiki\/([^?#]+)/.exec(line);
+  if(m){ host=m[1].replace('.m.wikipedia','.wikipedia'); try{ title=decodeURIComponent(m[2]); }catch(e){ title=m[2]; } }
+  title=title.replace(/_/g,' ').replace(/^(カテゴリ|category)\s*:/i,'Category:');
+  if(!/^Category:/.test(title)) title='Category:'+title;
+  return {host,title};
+}
+// カテゴリを子カテゴリまでたどって、人（WikidataのQID）を集める
+async function crawlCats(roots, depth, exRe, prog){
+  const qids=new Set(), seen=new Set(), empty=[];
+  const queue=roots.map(r=>({...r,d:0,root:true}));
+  let ncat=0;
+  while(queue.length){
+    const c=queue.shift(); const key=c.host+'|'+c.title;
+    if(seen.has(key)) continue; seen.add(key); ncat++;
+    if(ncat>1500) break;                       // たどりすぎ防止
+    let cont={}, got=0;
+    while(cont){
+      const j=await wpApi(c.host,{action:'query', generator:'categorymembers', gcmtitle:c.title,
+        gcmtype:'page|subcat', gcmnamespace:'0|14', gcmlimit:'500', prop:'pageprops', ppprop:'wikibase_item', ...cont});
+      for(const pg of Object.values((j.query&&j.query.pages)||{})){
+        got++;
+        if(pg.ns===14){ if(c.d<depth && !(exRe && exRe.test(pg.title.replace(/^Category:/,'')))) queue.push({host:c.host,title:pg.title,d:c.d+1}); }
+        else if(pg.ns===0 && pg.pageprops && pg.pageprops.wikibase_item) qids.add(pg.pageprops.wikibase_item);
+      }
+      cont = j.continue ? {...j.continue} : null;
+      prog(ncat, queue.length, qids.size);
+    }
+    if(c.root && !got) empty.push(c.title);
+  }
+  return {qids:[...qids], ncat, empty};
+}
+async function searchHumans(q){
+  const hits=await wdSearch(q); if(!hits.length) return [];
+  const ppl=await fetchPeople(hits.map(h=>h.id));
+  return hits.map(h=>{const p=ppl[h.id]; if(p&&!p.desc&&h.description)p.desc=h.description; return p;}).filter(p=>p&&p.b!=null);
+}
+
+/* ---------- 状態 ---------- */
+// cats[id] = {query, rows:[{id,n,desc,b,d,links,on}], status}
+// presets[i] = {name, text, res:[{q, sel, cands:[person]}]}
+let S = load() || fresh();
+function catDefaults(c){ return {mode:c.mode||'occ', cats:(c.cats||[]).join('\n'), depth:c.depth??2, ex:DEF_EX, v6:true, v8:true, bmin:c.bmin??null, bmax:c.bmax??null}; }
+function rngOf(st){ return {bmin:st.bmin??null, bmax:st.bmax??null}; }
+function fresh(){
+  const cats={}; for(const c of CAT_DEFS) cats[c.id]={query:buildQuery(c), sig:JSON.stringify(c), rows:[], status:'', ...catDefaults(c)};
+  return {cats, presets:PRESET_DEFS.map(p=>({name:p.name, text:p.names.join('\n'), res:[]}))};
+}
+function load(){ try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)); if(s&&s.cats){
+  for(const c of CAT_DEFS){
+    const st=s.cats[c.id];
+    if(!st){ s.cats[c.id]={query:buildQuery(c), sig:JSON.stringify(c), rows:[], status:'', ...catDefaults(c)}; continue; }
+    // v0.5までのデータはそのまま残して、集め方の設定だけ足す
+    if(!st.v6) Object.assign(st, catDefaults(c), {sig:JSON.stringify(c)});
+    if(!('bmin' in st)){ st.bmin=c.bmin??null; st.bmax=c.bmax??null; }
+    if(!st.v8){ st.query=buildQuery(c, rngOf(st)); st.v8=true; }
+  }
+  return s; } }catch(e){} return null; }
+function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} summary(); }
+
+// 軽くするため、検索の順番を固定（optimizer None）：
+// 日本 → まず国籍で絞る → 職業 → 有名さ / それ以外 → 職業 → 有名さ
+function buildQuery(c, rng){
+  rng = rng || {bmin:c.bmin??null, bmax:c.bmax??null};
+  const occList=c.occ.map(q=>'wd:'+q);
+  let head;
+  if(c.region==='jp') head=`  VALUES ?ctz { wd:Q17 wd:Q188712 }
+  ?p wdt:P27 ?ctz .
+  ?p wdt:P106 ?occ . FILTER(?occ IN (${occList.join(', ')}))`;
+  else head=`  VALUES ?occ { ${occList.join(' ')} }
+  ?p wdt:P106 ?occ .`;
+  const minus = c.region==='world' ? `\n  MINUS { ?p wdt:P27 wd:Q17 }\n  MINUS { ?p wdt:P27 wd:Q188712 }` : '';
+  const f=[]; if(rng.bmin!=null)f.push(`YEAR(?y) >= ${rng.bmin}`); if(rng.bmax!=null)f.push(`YEAR(?y) <= ${rng.bmax}`);
+  return `SELECT ?p (MAX(?sl) AS ?links) WHERE {
+  hint:Query hint:optimizer "None" .
+${head}
+  ?p wikibase:sitelinks ?sl .
+  FILTER(?sl >= ${c.minLinks})
+  ?p wdt:P31 wd:Q5 .
+  ?p rdfs:label ?jl . FILTER(LANG(?jl) = "ja")
+  OPTIONAL { ?p wdt:P569 ?b0 } OPTIONAL { ?p wdt:P1317 ?f0 }
+  BIND(COALESCE(?b0, ?f0) AS ?y)
+  FILTER(BOUND(?y))${f.length?`\n  FILTER(${f.join(' && ')})`:''}${minus}
+}
+GROUP BY ?p
+ORDER BY DESC(?links)
+LIMIT 400`;
+}
+
+/* ---------- 分野 UI ---------- */
+function drawCats(){
+  $('#cats').innerHTML = CAT_DEFS.map(c=>`<div class="panel" id="cat-${c.id}"></div>`).join('');
+  CAT_DEFS.forEach(c=>drawCat(c.id));
+}
+// 表の並べ替え（見た目だけ。#＝有名さ順の順位はそのまま）
+function sortTh(st,k,label){
+  const s=st.sort||{k:'rank',dir:1};
+  return `<th data-sort="${k}">${label}${s.k===k?` <span class="ar">${s.dir>0?'▲':'▼'}</span>`:''}</th>`;
+}
+function sortedView(st){
+  const s=st.sort||{k:'rank',dir:1};
+  const v=st.rows.map((r,i)=>({r,i}));
+  if(s.k==='rank') return s.dir>0?v:v.reverse();
+  const val=x=>s.k==='rank'?x.i:x.r[s.k];
+  v.sort((a,b)=>{
+    const A=val(a), B=val(b);
+    if(A==null&&B==null) return a.i-b.i;
+    if(A==null) return 1; if(B==null) return -1;   // 没年なし・有名さなしは常に下
+    const c = s.k==='n' ? String(A).localeCompare(String(B),'ja') : A-B;
+    return (c||a.i-b.i)*s.dir;
+  });
+  return v;
+}
+function drawCat(id){
+  const def=CAT_DEFS.find(c=>c.id===id), st=S.cats[id], el=$('#cat-'+id);
+  const on=st.rows.filter(r=>r.on).length;
+  el.innerHTML=`<div class="cat-head"><b>${esc(def.name)}</b>
+      <button data-act="fetch">取得</button>
+      <span class="st stmain ${st.status.startsWith('×')?'ng':st.rows.length?'ok':''}">${esc(st.status)}</span>
+      ${st.rows.length?`<span class="st">採用 ${on} / ${st.rows.length}人</span>
+      <button data-act="top">上位${KEEP}だけ採用</button>`:''}</div>
+    <div class="mode">
+      <label><input type="radio" name="m-${id}" value="cat" data-act="mode" ${st.mode==='cat'?'checked':''}> カテゴリから</label>
+      <label><input type="radio" name="m-${id}" value="occ" data-act="mode" ${st.mode!=='cat'?'checked':''}> 職業から</label>
+      <label class="note">生年 <input type="text" data-act="bmin" value="${esc(outYear(st.bmin))}" placeholder="下限なし" style="width:84px"> 〜 <input type="text" data-act="bmax" value="${esc(outYear(st.bmax))}" placeholder="上限なし" style="width:84px"> 年</label>
+      <span class="st rngmsg">紀元前は「前500」。変えたら取得し直し</span>
+    </div>
+    ${st.mode==='cat'?`<div class="catbox">
+      <div class="note">元にするカテゴリ（1行に1つ。URLでも「Category:名前」でもOK）</div>
+      <textarea data-act="cats" placeholder="https://ja.wikipedia.org/wiki/Category:...">${esc(st.cats)}</textarea>
+      <div class="ctrl">
+        <label class="note">子カテゴリを <input type="number" min="0" max="5" value="${st.depth}" data-act="depth" style="width:56px"> 段下までたどる</label>
+        <label class="note">入れない子カテゴリ（ことば、|で区切る）<input type="text" data-act="ex" value="${esc(st.ex)}" style="width:320px"></label>
+      </div></div>`
+    :`<details><summary>問い合わせ文（時間切れになったら FILTER(?sl >= 数) の数を上げる）</summary>
+      <textarea data-act="q">${esc(st.query)}</textarea>
+      <button data-act="resetq">元に戻す</button></details>`}
+    ${st.rows.length?`<div class="ctrl" style="margin-top:6px">
+      <input type="text" placeholder="表の中をしぼりこみ" data-act="filter" style="width:180px">
+      <span class="sbox"><input type="text" placeholder="人を足す（名前で検索）" data-act="add" style="width:220px"><span class="dd" style="display:none"></span></span>
+      </div>
+      <div class="tbl"><table><thead><tr><th></th>${sortTh(st,'rank','#')}${sortTh(st,'n','名前')}${sortTh(st,'b','生')}${sortTh(st,'d','没')}${sortTh(st,'links','有名さ')}<th>説明</th></tr></thead><tbody>
+      ${sortedView(st).map(({r,i})=>`<tr class="${r.on?'':'off'}" data-n="${esc(r.n)}"><td><input type="checkbox" data-i="${i}" ${r.on?'checked':''}></td>
+        <td>${i+1}</td><td><a href="https://www.wikidata.org/wiki/${r.id}" target="_blank" rel="noopener">${esc(r.n)}</a></td>
+        <td title="${esc(noteOf(r))}">${r.b!=null?esc(birthTxt(r)):r.f!=null?`<span class="st">（活動 ${esc(yearLabel(r.f,9))}${r.f2!=null?'〜'+esc(yearLabel(r.f2,9)):''}）</span>`:''}${r.bv&&r.bv.length>1?' <span class="st">諸説</span>':''}</td>
+        <td>${esc(deathTxt(r))}${r.dv&&r.dv.length>1?' <span class="st">諸説</span>':''}</td><td>${r.links??'追加'}</td><td class="desc">${esc(r.desc)}</td></tr>`).join('')}
+      </tbody></table></div>`:''}`;
+}
+// 生年（なければ活動時期）が範囲に入ってる人だけ
+function inRange(list, st){
+  return list.filter(p=>{ const y=p.b??p.f; if(y==null) return false;
+    return (st.bmin==null||y>=st.bmin) && (st.bmax==null||y<=st.bmax); });
+}
+function setSt(id,msg){ const st=S.cats[id]; st.status=msg; const el=document.querySelector('#cat-'+id+' .stmain'); if(el) el.textContent=msg; else drawCat(id); }
+function mergeRows(st, fresh){
+  const old=new Map(st.rows.map(r=>[r.id,r]));
+  st.rows=fresh.map((r,i)=>{ const o=old.get(r.id); return {...r, on:o?o.on:i<KEEP}; });
+  for(const o of old.values()) if(o.links==null && !st.rows.find(r=>r.id===o.id)) st.rows.push(o);   // 手で足した人は残す
+}
+async function fetchCat(id){ return S.cats[id].mode==='cat' ? fetchCatByCategory(id) : fetchCatByOcc(id); }
+async function fetchCatByCategory(id){
+  const st=S.cats[id], def=CAT_DEFS.find(c=>c.id===id);
+  const roots=st.cats.split('\n').map(parseCat).filter(Boolean);
+  if(!roots.length){ setSt(id,'× カテゴリが空っぽ'); return; }
+  let exRe=null; try{ const ex=(st.ex||'').trim(); if(ex) exRe=new RegExp(ex); }catch(e){ setSt(id,'× 入れないことばの書き方がヘン'); return; }
+  drawCat(id);
+  try{
+    const res=await crawlCats(roots, Math.max(0,Math.min(5,+st.depth||0)), exRe,
+      (n,left,q)=>setSt(id,`カテゴリたどり中… ${n}個目（のこり${left}） 見つけた記事 ${q}`));
+    if(!res.qids.length){ setSt(id,'× 誰も見つからない'+(res.empty.length?'（カテゴリ名が違うかも：'+res.empty.join('、')+'）':'')); save(); return; }
+    const ppl=await fetchPeople(res.qids, 80, (i,n)=>setSt(id,`生没年を取得中… ${i}/${n}`));
+    let list=inRange(Object.values(ppl), st);
+    list.sort((a,b)=>(b.links||0)-(a.links||0));
+    mergeRows(st, list.map(p=>({...pickFields(p), links:p.links??0})));
+    st.status=`○ ${list.length}人 取れた（カテゴリ${res.ncat}個）`+(res.empty.length?` ※見つからないカテゴリ：${res.empty.join('、')}`:'');
+  }catch(e){ st.status='× 失敗 '+e.message; }
+  drawCat(id); save();
+}
+async function fetchCatByOcc(id){
+  const st=S.cats[id]; st.status='取得中…'; drawCat(id);
+  try{
+    let rows;
+    try{ rows=await sparql(st.query); }
+    catch(e1){ st.status='もう一回ためし中…'; drawCat(id); await sleep(5000); rows=await sparql(st.query); }
+    const order=[], lk={};
+    for(const r of rows){ const pid=r.p.value.split('/').pop(); if(!(pid in lk)){ order.push(pid); lk[pid]=r.links?+r.links.value:null; } }
+    const ppl=await fetchPeople(order, 80, (i,n)=>setSt(id,`生没年を取得中… ${i}/${n}`));
+    let list=inRange(order.map(q=>ppl[q]).filter(Boolean), st);
+    list.forEach(p=>{ if(lk[p.id]!=null) p.links=lk[p.id]; });
+    list.sort((a,b)=>(b.links||0)-(a.links||0));
+    mergeRows(st, list.map(p=>({...pickFields(p), links:p.links??0})));
+    st.status=`○ ${list.length}人 取れた`;
+  }catch(e){ st.status='× 失敗 '+e.message; }
+  drawCat(id); save();
+}
+$('#cats').addEventListener('click', async ev=>{
+  const panel=ev.target.closest('.panel'); if(!panel) return; const id=panel.id.slice(4); const st=S.cats[id];
+  const act=ev.target.dataset.act;
+  const th=ev.target.closest('th[data-sort]');
+  if(th){ const k=th.dataset.sort, cur=st.sort||{k:'rank',dir:1};
+    // 有名さは大きい順から、それ以外は小さい順から
+    st.sort = cur.k===k ? {k,dir:-cur.dir} : {k,dir:k==='links'?-1:1};
+    const tbl=panel.querySelector('.tbl'), top=tbl?tbl.scrollTop:0; drawCat(id); save(); return; }
+  if(act==='fetch') fetchCat(id);
+  if(act==='top'){ st.rows.forEach((r,i)=>r.on = r.links==null ? r.on : i<KEEP); drawCat(id); save(); }
+  if(act==='resetq'){ st.query=buildQuery(CAT_DEFS.find(c=>c.id===id), rngOf(st)); drawCat(id); save(); }
+  if(ev.target.type==='checkbox'){ const r=st.rows[+ev.target.dataset.i]; r.on=ev.target.checked; ev.target.closest('tr').classList.toggle('off',!r.on);
+    panel.querySelector('.cat-head .st:nth-of-type(2)').textContent=`採用 ${st.rows.filter(r=>r.on).length} / ${st.rows.length}人`; save(); }
+  const dd=ev.target.closest('.dd div[data-pid]');
+  if(dd){ const p=JSON.parse(dd.dataset.p); if(!st.rows.find(r=>r.id===p.id)) st.rows.unshift({...p,links:null,on:true}); drawCat(id); save(); }
+});
+$('#cats').addEventListener('input', ev=>{
+  const panel=ev.target.closest('.panel'); if(!panel) return; const id=panel.id.slice(4); const st=S.cats[id];
+  const act=ev.target.dataset.act;
+  if(act==='q'){ st.query=ev.target.value; save(); }
+  if(act==='cats'){ st.cats=ev.target.value; save(); }
+  if(act==='depth'){ st.depth=+ev.target.value; save(); }
+  if(act==='ex'){ st.ex=ev.target.value; save(); }
+  if(act==='bmin'||act==='bmax'){
+    const y=inYear(ev.target.value), msg=panel.querySelector('.rngmsg');
+    if(Number.isNaN(y)){ msg.textContent='× 年の書き方がヘン（例：1400、前500）'; msg.classList.add('ng'); return; }
+    msg.classList.remove('ng'); msg.textContent='変えた → 「取得」し直してネ';
+    const def=CAT_DEFS.find(c=>c.id===id), before=buildQuery(def, rngOf(st));
+    st[act]=y;
+    if(st.query===before) st.query=buildQuery(def, rngOf(st));   // 問い合わせ文を手で直してなければ、範囲も反映
+    const ta=panel.querySelector('textarea[data-act=q]'); if(ta) ta.value=st.query;
+    save();
+  }
+  if(act==='filter'){ const f=ev.target.value.trim(); panel.querySelectorAll('tbody tr').forEach(tr=>tr.style.display=!f||tr.dataset.n.includes(f)?'':'none'); }
+  if(act==='add'){
+    const box=ev.target.nextElementSibling, v=ev.target.value.trim();
+    clearTimeout(ev.target._t); if(!v){ box.style.display='none'; return; }
+    ev.target._t=setTimeout(async()=>{
+      box.style.display='block'; box.innerHTML='<div>さがし中…</div>';
+      try{ const ps=await searchHumans(v);
+        box.innerHTML = ps.length ? ps.map(p=>`<div data-pid="${p.id}" data-p="${esc(JSON.stringify(pickFields(p)))}">${esc(p.n)}　${esc(birthTxt(p))}–${esc(deathTxt(p))}<small>${esc(p.desc)}</small></div>`).join('') : '<div>見つからない</div>';
+      }catch(e){ box.innerHTML='<div>つながらない…</div>'; }
+    },400);
+  }
+});
+$('#connTest').addEventListener('click', async ()=>{
+  const out=[]; $('#allSt').textContent='テスト中…';
+  try{ const r=await sparql('SELECT ?b WHERE { wd:Q42 wdt:P569 ?b }'); out.push(r.length?'問い合わせ ○':'問い合わせ △（空）'); }
+  catch(e){ out.push('問い合わせ × '+e.message); }
+  try{ const h=await wdSearch('夏目漱石'); out.push(h.length?'検索 ○':'検索 △（空）'); }
+  catch(e){ out.push('検索 ×'); }
+  $('#allSt').textContent=out.join(' ／ ');
+});
+$('#keepAll').addEventListener('click', ()=>{
+  for(const c of CAT_DEFS){ S.cats[c.id].rows.forEach((r,i)=>{ if(r.links!=null) r.on = i<KEEP; }); drawCat(c.id); }
+  save(); $('#allSt').textContent='全分野、上位'+KEEP+'人を採用にした';
+});
+$('#cats').addEventListener('change', ev=>{
+  if(ev.target.dataset.act!=='mode') return;
+  const id=ev.target.closest('.panel').id.slice(4); S.cats[id].mode=ev.target.value; drawCat(id); save();
+});
+$('#fetchAll').addEventListener('click', async ev=>{
+  ev.target.disabled=true;
+  for(let i=0;i<CAT_DEFS.length;i++){ $('#allSt').textContent=`${i+1}/${CAT_DEFS.length} ${CAT_DEFS[i].name}`; await fetchCat(CAT_DEFS[i].id); await sleep(1500); }
+  const ng=CAT_DEFS.filter(c=>S.cats[c.id].status.startsWith('×')).length;
+  $('#allSt').textContent = ng ? `おわり（失敗 ${ng}分野 → 個別に「取得」し直すか、問い合わせ文の数を上げる）` : 'おわり！';
+  ev.target.disabled=false;
+});
+
+/* ---------- プリセット UI ---------- */
+function drawPresets(){
+  $('#presets').innerHTML = S.presets.map((p,i)=>`<div class="panel" data-pi="${i}">
+    <div class="ctrl"><input type="text" value="${esc(p.name)}" data-act="name" style="width:220px">
+      <button data-act="resolve">解決</button><button data-act="del">削除</button>
+      <span class="st">${p.res.length?`${p.res.filter(r=>r.sel).length}/${p.res.length}人 結びついた`:''}</span></div>
+    <details ${p.res.length?'':'open'}><summary>名前リスト</summary><textarea data-act="text" style="min-height:120px;font-family:inherit;font-size:13px">${esc(p.text)}</textarea></details>
+    ${p.res.length?`<div class="pre-res">${p.res.map((r,j)=>`<div class="r"><span>${esc(r.q)}</span>${r.cands.length?
+      `<select data-j="${j}">${r.cands.map(c=>`<option value="${c.id}" ${c.id===r.sel?'selected':''}>${esc(c.n)} ${esc(birthTxt(c))}–${esc(deathTxt(c))} ${esc((c.desc||'').slice(0,18))}</option>`).join('')}<option value="" ${!r.sel?'selected':''}>（入れない）</option></select>`
+      :'<span class="miss">見つからない</span>'}</div>`).join('')}</div>`:''}
+  </div>`).join('');
+}
+async function resolvePreset(i){
+  const p=S.presets[i]; const names=p.text.split('\n').map(s=>s.trim()).filter(Boolean);
+  p.res=[];
+  for(let k=0;k<names.length;k++){
+    $('#preSt').textContent=`「${p.name}」 ${k+1}/${names.length}`;
+    let cands=[]; try{ cands=await searchHumans(names[k]); }catch(e){}
+    cands=cands.slice(0,5).map(c=>({...pickFields(c), links:c.links}));
+    p.res.push({q:names[k], sel:cands[0]?cands[0].id:'', cands});
+    await sleep(200);
+  }
+  $('#preSt').textContent=''; drawPresets(); save();
+}
+$('#presets').addEventListener('click', ev=>{
+  const box=ev.target.closest('[data-pi]'); if(!box) return; const i=+box.dataset.pi;
+  if(ev.target.dataset.act==='resolve') resolvePreset(i);
+  if(ev.target.dataset.act==='del' && confirm('このプリセット消す？')){ S.presets.splice(i,1); drawPresets(); save(); }
+});
+$('#presets').addEventListener('change', ev=>{
+  const box=ev.target.closest('[data-pi]'); if(!box||ev.target.tagName!=='SELECT') return;
+  S.presets[+box.dataset.pi].res[+ev.target.dataset.j].sel=ev.target.value; save();
+});
+$('#presets').addEventListener('input', ev=>{
+  const box=ev.target.closest('[data-pi]'); if(!box) return; const p=S.presets[+box.dataset.pi];
+  if(ev.target.dataset.act==='name') p.name=ev.target.value;
+  if(ev.target.dataset.act==='text') p.text=ev.target.value;
+  save();
+});
+$('#resolveAll').addEventListener('click', async ev=>{ ev.target.disabled=true; for(let i=0;i<S.presets.length;i++) await resolvePreset(i); ev.target.disabled=false; });
+$('#addPreset').addEventListener('click', ()=>{ S.presets.push({name:'新しいプリセット',text:'',res:[]}); drawPresets(); save(); });
+
+/* ---------- 書き出し・読込 ---------- */
+function buildExport(){
+  const people={}, categories=[], presets=[];
+  const put=p=>{ const o=pickFields(p); delete o.id; if(!o.desc) delete o.desc; if(p.links!=null) o.l=p.links; people[p.id]=o; };
+  for(const c of CAT_DEFS){ const rows=S.cats[c.id].rows.filter(r=>r.on); if(!rows.length) continue;
+    rows.forEach(put); categories.push({id:c.id,name:c.name,ids:rows.map(r=>r.id)}); }
+  for(const p of S.presets){ const ids=[]; for(const r of p.res){ if(!r.sel) continue; const c=r.cands.find(x=>x.id===r.sel); if(c){ if(!people[c.id])put(c); ids.push(c.id);} }
+    if(ids.length) presets.push({name:p.name,ids}); }
+  return {version:2, generated:new Date().toISOString().slice(0,10), source:'Wikidata (CC0)', people, categories, presets};
+}
+function summary(){
+  const d=buildExport();
+  $('#sumSt').textContent=`いま：${Object.keys(d.people).length}人 / 分野${d.categories.length} / プリセット${d.presets.length}`;
+}
+$('#export').addEventListener('click', ()=>{
+  const d=buildExport();
+  if(!Object.keys(d.people).length){ alert('まだ誰もいない…先に取得してね'); return; }
+  const blob=new Blob([JSON.stringify(d)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='seibotsunen-data.json'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+});
+$('#importFile').addEventListener('change', async ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  try{
+    const d=JSON.parse(await f.text()); const st=fresh();
+    for(const c of d.categories||[]){ if(!st.cats[c.id]) continue;
+      st.cats[c.id].rows=c.ids.map(id=>{const p=d.people[id]; return {...pickFields({id,...p}), links:p.l??null, on:true};});
+      st.cats[c.id].status='○ ファイルから'; }
+    st.presets=(d.presets||[]).map(p=>({name:p.name,text:p.ids.map(id=>d.people[id].n).join('\n'),
+      res:p.ids.map(id=>{const q=d.people[id]; const c={...pickFields({id,...q}), links:q.l}; return {q:q.n,sel:id,cands:[c]};})}));
+    S=st; drawCats(); drawPresets(); save(); alert('読み込んだ！');
+  }catch(e){ alert('読めないファイル…'); }
+});
+$('#reset').addEventListener('click', ()=>{ if(confirm('全部消して最初から？')){ S=fresh(); drawCats(); drawPresets(); save(); } });
+
+drawCats(); drawPresets(); summary();
+</script>
+</body>
+</html>
