@@ -103,7 +103,7 @@ textarea{width:100%;min-height:80px}
 .era,.gridl,.ovl,.cline,.evl{position:absolute;pointer-events:none}
 .ovl{background:var(--ovl)}
 .cyear{position:absolute;background:var(--accent);color:var(--onaccent);font-size:11px;border-radius:5px;padding:1px 6px;display:none;z-index:6;white-space:nowrap;pointer-events:none}
-.bar{position:absolute;overflow:hidden;cursor:pointer;font-size:11px;color:#fff;border-radius:5px}
+.bar{position:absolute;overflow:hidden;cursor:pointer;font-size:11px;color:#fff;border-radius:5px;box-shadow:none}
 .bar .lb{position:absolute;display:flex;align-items:center;gap:5px;padding:0 6px;white-space:nowrap;text-shadow:0 0 3px rgba(0,0,0,.35)}
 .bar .lb b,.lbo b{font-weight:700}
 .bar.period{border-radius:1px}
@@ -222,7 +222,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.8</span><span class="lbl" id="dataStat"></span></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.9</span><span class="lbl" id="dataStat"></span></header>
 <div class="wrap">
 
   <div class="panel">
@@ -675,11 +675,13 @@ function barOf(p){
   const h = colorH(p.id), c = `hsl(${h} var(--bs) var(--bl))`;
   const left = ba, right = Math.max(e.z, bz+0.5), w = right-left;
   const pc = v => ((v-left)/w*100).toFixed(2)+'%';
+  // ぼかしは透明（0）から、なめらかなカーブで色に（地の色に溶けるように）
+  const EASE = [[0,0],[.15,.04],[.3,.13],[.45,.28],[.6,.47],[.75,.68],[.88,.86],[1,1]];
+  const ramp = (from, to, rev) => EASE.map(([t,a])=>{ const x=from+(to-from)*t; const al = rev ? 1-a : a;
+    return `hsl(${h} var(--bs) var(--bl) / ${al.toFixed(2)}) ${((x-left)/w*100).toFixed(2)}%`; });
   const st = [];
-  if(bz>ba) st.push(`hsl(${h} var(--bs) var(--bl) / .18) 0%`, `${c} ${pc(bz)}`); else st.push(`${c} 0%`);
-  if(e.kind==='unknown' && e.z>e.a) st.push(`${c} ${pc(e.a)}`, `hsl(${h} var(--bs) var(--bl) / 0) 100%`);
-  else if(e.z>e.a) st.push(`${c} ${pc(e.a)}`, `hsl(${h} var(--bs) var(--bl) / .18) 100%`);
-  else st.push(`${c} 100%`);
+  if(bz>ba) st.push(...ramp(ba, bz, false)); else st.push(`${c} 0%`);
+  if(e.z>e.a) st.push(...ramp(e.a, e.z, true)); else st.push(`${c} 100%`);
   let txt;
   if(isPeriod(p)) txt = `${fmtY(p.b)}–${fmtY(p.d)}（${p.d-p.b}年間）`;
   else {
