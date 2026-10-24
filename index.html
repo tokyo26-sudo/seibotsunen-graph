@@ -131,7 +131,12 @@ textarea{width:100%;min-height:80px}
 .H .gseg.tiny::after{content:"";position:absolute;top:0;bottom:0;left:-4px;right:-4px}
 .V .gseg.tiny::after{content:"";position:absolute;left:0;right:0;top:-4px;bottom:-4px}
 .gpop{position:fixed;z-index:60;background:var(--ink);color:var(--bg);font-size:12px;padding:4px 8px;border-radius:6px;white-space:nowrap;pointer-events:none;display:none;box-shadow:0 3px 10px rgba(0,0,0,.25)}
-.evlb{position:absolute;font-size:10.5px;color:var(--ev);white-space:nowrap;background:var(--panel);padding:0 3px;border-radius:3px;z-index:3}
+.evlb{position:absolute;font-size:10.5px;color:var(--ev);white-space:nowrap;background:var(--panel);padding:0 3px;border-radius:3px;z-index:3;pointer-events:auto;cursor:pointer}
+.evlb:hover{text-decoration:underline}
+.evpop{position:fixed;z-index:61;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.22);padding:8px 10px;font-size:13px;display:none;max-width:280px}
+.evpop .t{font-weight:700;margin-bottom:2px}
+.evpop .nt{color:var(--sub);font-size:11.5px;margin-bottom:6px}
+.evpop button{font-size:12px;padding:4px 10px;color:var(--accent)}
 .evl{border-color:var(--ev);border-style:dashed;border-width:0;opacity:.8}
 
 /* ===== 横 ===== */
@@ -226,7 +231,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.13</span><span class="lbl" id="dataStat"></span></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.14</span><span class="lbl" id="dataStat"></span></header>
 <div class="wrap">
 
   <div class="panel">
@@ -235,7 +240,7 @@ textarea{width:100%;min-height:80px}
         <input type="text" id="q" placeholder="名前を入れて追加（例：織田信長）" autocomplete="off">
         <div class="dd" id="dd"></div>
       </div>
-      <span class="seg" id="orient"><button data-o="h" class="on">横</button><button data-o="v">縦</button></span>
+      <span class="seg" id="orient"><button data-o="h" class="on" title="横表示（時間が左→右）">↔️</button><button data-o="v" title="縦表示（時間が上→下）">↕️</button></span>
       <button class="tog" data-sec="add" aria-expanded="false">＋ 足す</button>
       <button class="tog" data-sec="set" aria-expanded="false">⚙ 設定</button>
       <span class="menu"><button id="moreBtn" title="保存・読み込みなど">⋯</button>
@@ -308,6 +313,7 @@ textarea{width:100%;min-height:80px}
           <span class="lbl" id="mMsg">紀元前は「前221」</span>
         </div>
         <div class="chips" id="manList"></div>
+        <div class="ctrl" style="margin-top:6px"><button id="evClear" style="display:none">できごとを全部消す</button><button id="pdClear" style="display:none">期間を全部消す</button></div>
       </details>
       <details style="margin-top:6px">
         <summary>まとめて追加（1行に1人）</summary>
@@ -328,6 +334,7 @@ textarea{width:100%;min-height:80px}
 </div>
 <div class="toast" id="toast"></div>
 <div class="gpop" id="gpop"></div>
+<div class="evpop" id="evpop"></div>
 
 <script>
 'use strict';
@@ -802,8 +809,58 @@ function readViewCode(v){
   if(['jp','world','cn','none'].includes(era)) $('#era').value=era;
   if(['birth','death','life','added'].includes(sort)) $('#sort').value=sort;
 }
-function syncURL(){
+// ---- 共有URLを短く：中身をまとめて圧縮（deflate）して1つの s= に ----
+const canZip = typeof CompressionStream!=='undefined' && typeof DecompressionStream!=='undefined';
+const b64u = bytes => { let s=''; for(const b of bytes) s+=String.fromCharCode(b); return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); };
+const unb64u = t => { t=t.replace(/-/g,'+').replace(/_/g,'/'); while(t.length%4) t+='='; const s=atob(t); return Uint8Array.from(s, c=>c.charCodeAt(0)); };
+async function zipStr(str){ const cs=new Blob([str]).stream().pipeThrough(new CompressionStream('deflate-raw')); return b64u(new Uint8Array(await new Response(cs).arrayBuffer())); }
+async function unzipStr(t){ const ds=new Blob([unb64u(t)]).stream().pipeThrough(new DecompressionStream('deflate-raw')); return await new Response(ds).text(); }
+function presetKey(o, key){   // プリセットの何番目か（古いデータは名前から探す）
+  if(o.pk) return o.pk;
+  for(let i=0;i<PERIOD_PRESETS.length;i++){ const j=(PERIOD_PRESETS[i][key]||[]).findIndex(it=>it.n===o.n); if(j>=0) return [i,j]; }
+  return null;
+}
+function packState(){
+  const L=list.map(id=>{ const p=PEOPLE[id];
+    if(/^Q\d+$/.test(id)) return +id.slice(1);
+    if(p && p.pre){ const k=presetKey(p,'items'); if(k) return k; }
+    return ['p', p.n, p.b, p.d]; });
+  const E=events.map(e=>{ if(e.pre){ const k=presetKey(e,'events'); if(k) return k; } return ['e', e.n, e.y]; });
+  const o={L, v:viewCode()};
+  if(E.length) o.E=E;
+  const t=$('#title').value.trim(); if(t) o.t=t;
+  const sel=selected.map(id=>list.indexOf(id)).filter(i=>i>=0); if(sel.length) o.s=sel;
+  if(ZOOM>1.01){ const vi=viewInfo(); if(vi){ o.z=+ZOOM.toFixed(2); o.c=Math.round(vi.center); } }
+  return JSON.stringify(o);
+}
+async function unpackState(o){
+  if(o.v) readViewCode(o.v);
+  if(o.t) $('#title').value=o.t;
+  const ids=[];
+  for(const x of o.L||[]){
+    if(typeof x==='number'){ ids.push('Q'+x); continue; }
+    const id='M'+(manSeq++);
+    if(Array.isArray(x) && x[0]==='p'){ PEOPLE[id]={id, n:x[1], type:'period', b:x[2], d:x[3]}; ids.push(id); continue; }
+    if(Array.isArray(x) && typeof x[0]==='number'){ const it=(PERIOD_PRESETS[x[0]]||{}).items?.[x[1]]; const q=it&&presetPeriod(it); if(q){ PEOPLE[id]={id,...q,pre:1,pk:x}; ids.push(id); } }
+  }
+  for(const x of o.E||[]){
+    const id='E'+(manSeq++);
+    if(Array.isArray(x) && x[0]==='e') events.push({id, n:x[1], y:x[2]});
+    else if(Array.isArray(x)){ const it=(PERIOD_PRESETS[x[0]]||{}).events?.[x[1]]; if(it) events.push({...presetEvent(it,id), pk:x}); }
+  }
+  events.sort((a,b)=>a.y-b.y);
+  return ids;
+}
+let urlSeq=0;
+async function syncURL(){
   if(!READY) return;
+  if(canZip){
+    const my=++urlSeq, z=await zipStr(packState()); if(my!==urlSeq) return;
+    const u=new URL(location.href); u.search='?s='+z; history.replaceState(null,'',u); return;
+  }
+  syncURLPlain();
+}
+function syncURLPlain(){
   const u = new URL(location.href);
   const setp=(k,v)=>{ if(v) u.searchParams.set(k,v); else u.searchParams.delete(k); };
   setp('ids', list.join(','));
@@ -836,8 +893,8 @@ function addPresetSet(i){
   const ps=PERIOD_PRESETS[i]; let nA=0;
   const have=new Set([...list.map(id=>PEOPLE[id]&&PEOPLE[id].n), ...events.map(e=>e.n)]);
   for(const it of ps.items||[]){ if(have.has(it.n)) continue; const q=presetPeriod(it); if(!q) continue;
-    const id='M'+(manSeq++); PEOPLE[id]={id,...q,pre:1}; list.push(id); nA++; }
-  for(const it of ps.events||[]){ if(have.has(it.n)) continue; events.push(presetEvent(it,'E'+(manSeq++))); nA++; }
+    const id='M'+(manSeq++); PEOPLE[id]={id,...q,pre:1, pk:[i,(ps.items||[]).indexOf(it)]}; list.push(id); nA++; }
+  for(const it of ps.events||[]){ if(have.has(it.n)) continue; events.push({...presetEvent(it,'E'+(manSeq++)), pk:[i,ps.events.indexOf(it)]}); nA++; }
   events.sort((x,y)=>x.y-y.y);
   toast(nA ? `「${ps.name}」を${nA}こ足した` : 'もう全部入ってる');
   render(); syncURL();
@@ -997,7 +1054,7 @@ function render(){
     return `<div class="gseg ${g.lane==='all'?'':g.lane} ${(gk++)%2?'alt':''}" style="${extra||''}${box(g.s,g.e)}" data-pop="${esc(nm)}">${esc(g.n)}</div>`; };
   const genRows = bands.map(b=>`<div class="arow gen">${b.segs.map(g=>segHTML(g)).join('')}</div>`).join('');
   const tickLbl = ticks.map(t=>{ const gt=tickG(t); return `<div class="tick" style="${pos(t)}">${fmtY(t)}${gt.map(x=>`<small>${esc(x)}</small>`).join('')}</div>`; }).join('');
-  const evLbl = events.map(ev=>`<div class="evlb" style="${pos(ev.y)}" title="${esc(fmtY(ev.y)+'年 '+ev.n+(ev.note?'（'+ev.note+'）':''))}">${esc(fmtY(ev.y))} ${esc(ev.n)}</div>`).join('');
+  const evLbl = events.map(ev=>`<div class="evlb" data-eid="${ev.id}" style="${pos(ev.y)}" title="押すと「消す」が出る">${esc(fmtY(ev.y))} ${esc(ev.n)}</div>`).join('');
 
   const handle = p => `<span class="grip">⋮⋮</span><button class="x" title="消す" data-rm="${p.id}">×</button>`;
   const barHTML = (p,g) => `<div class="${g.cls}" data-sel="${p.id}" style="${box(g.left,g.right)};background:linear-gradient(${V?'180deg':'90deg'}, ${g.st.join(', ')})" title="${esc(p.n)} ${esc(g.txt)}${g.note?'&#10;'+esc(g.note):''}"><span class="lb" style="${V?'top':'left'}:${g.lbAt}"><b>${esc(p.n)}</b>${esc(g.txt)}</span></div>
@@ -1267,9 +1324,24 @@ function endDrag(){
 document.addEventListener('pointerup', endDrag);
 document.addEventListener('pointercancel', endDrag);
 
+function showEvPop(id, x, y){
+  const e=events.find(v=>v.id===id); if(!e) return; const pop=$('#evpop');
+  pop.innerHTML=`<div class="t">${esc(fmtY(e.y))}年　${esc(e.n)}</div>${e.note?`<div class="nt">${esc(e.note)}</div>`:''}<button data-evdel="${e.id}">× 消す</button>`;
+  pop.style.display='block';
+  const pw=pop.offsetWidth, ph=pop.offsetHeight;
+  pop.style.left=Math.max(4, Math.min(window.innerWidth-pw-4, x-pw/2))+'px';
+  pop.style.top=(y+ph+14 < window.innerHeight ? y+12 : Math.max(4, y-ph-12))+'px';
+}
+function hideEvPop(){ $('#evpop').style.display='none'; }
+$('#evpop').addEventListener('click', ev=>{ const b=ev.target.closest('[data-evdel]'); if(!b) return;
+  events=events.filter(e=>e.id!==b.dataset.evdel); hideEvPop(); render(); syncURL(); });
+document.addEventListener('click', ev=>{ if(!ev.target.closest('.evlb') && !ev.target.closest('#evpop')) hideEvPop(); });
+window.addEventListener('scroll', hideEvPop, {passive:true});
 var hidePop = function(){ $('#gpop').style.display='none'; hidePop.el=null; };
 $('#chart').addEventListener('click', ev=>{
   if(justDragged) return;
+  const el = ev.target.closest('.evlb');
+  if(el){ showEvPop(el.dataset.eid, ev.clientX, ev.clientY); return; }
   const gs = ev.target.closest('.gseg');
   if(gs){
     if(hidePop.el===gs){ hidePop(); return; }
@@ -1430,7 +1502,12 @@ $('#mAdd').addEventListener('click', ()=>{
   endEdit(); manMsg((was?'なおした！':'追加した！')+(ev?'（できごと・線）':'（期間・帯）'));
   render(); syncURL();
 });
+$('#evClear').addEventListener('click', ()=>{ if(!events.length) return; if(manEdit && /^E/.test(manEdit)) endEdit(); events=[]; toast('できごとを全部消した'); render(); syncURL(); });
+$('#pdClear').addEventListener('click', ()=>{ const ids=list.filter(id=>/^M/.test(id)); if(!ids.length) return; if(manEdit && /^M/.test(manEdit)) endEdit();
+  ids.forEach(id=>delete PEOPLE[id]); list=list.filter(id=>!/^M/.test(id)); selected=selected.filter(id=>list.includes(id)); toast('期間を全部消した'); render(); syncURL(); });
 function drawManList(){
+  $('#evClear').style.display = events.length ? '' : 'none';
+  $('#pdClear').style.display = list.some(id=>/^M/.test(id)) ? '' : 'none';
   const items=[...list.filter(id=>/^M/.test(id)).map(id=>PEOPLE[id]).filter(Boolean).map(p=>({id:p.id,t:`▭ ${p.n} ${fmtY(p.b)}–${fmtY(p.d)}`})),
                ...events.map(e=>({id:e.id,t:`┃ ${e.n} ${fmtY(e.y)}`}))];
   $('#manList').innerHTML = items.map(x=>`<span class="chip${manEdit===x.id?' editing':''}" data-mid="${x.id}" title="押すと年をなおせる">${esc(x.t)}<span class="cx" title="消す">×</span></span>`).join('');
@@ -1574,7 +1651,7 @@ $('#title').addEventListener('input', ()=>{ clearTimeout($('#title')._t); $('#ti
 $('#clear').addEventListener('click', ()=>{ runId++; list.filter(id=>/^M/.test(id)).forEach(id=>delete PEOPLE[id]);
   list=[]; events=[]; selected=[]; colorIdx={}; nextColor=0; render(); syncURL(); });
 $('#share').addEventListener('click', async ()=>{
-  syncURL();
+  await syncURL();
   try{ await navigator.clipboard.writeText(location.href); toast('URLコピーした！'); }catch(e){ prompt('このURLを共有',location.href); }
 });
 
@@ -1632,6 +1709,16 @@ $('#dataFile').addEventListener('change', async ev=>{
   try{ const r = await fetch(DATA_URL,{cache:'no-cache'}); if(r.ok) useData(await r.json()); }catch(e){}
   if(!DATA) $('#dataStat').textContent = '手元データなし（Wikidataから直接さがす）';
   const sp = new URL(location.href).searchParams;
+  if(sp.get('s') && canZip){
+    try{
+      const o=JSON.parse(await unzipStr(sp.get('s')));
+      const ids=await unpackState(o); applySet();
+      if(ids.length){ await ensureIds(ids); ids.forEach(id=>add(PEOPLE[id],true)); }
+      selected=(o.s||[]).map(i=>list[i]).filter(Boolean).slice(0,2);
+      if(o.z>1 && Number.isFinite(o.c)){ ZOOM=o.z; pendingAnchor={y:o.c, f:.5}; }
+      render(); READY=true; syncURL(); return;
+    }catch(e){ toast('共有URLが読めなかった…'); }
+  }
   readManualParam(sp.get('m'));
   if(sp.get('t')) $('#title').value=sp.get('t');
   if(sp.get('sort')==='added') $('#sort').value='added';     // 古い共有URL
