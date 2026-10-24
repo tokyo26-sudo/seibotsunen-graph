@@ -226,7 +226,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.10</span><span class="lbl" id="dataStat"></span></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.13</span><span class="lbl" id="dataStat"></span></header>
 <div class="wrap">
 
   <div class="panel">
@@ -263,6 +263,9 @@ textarea{width:100%;min-height:80px}
         <label>色<select id="theme">
           <option value="auto">自動</option><option value="cream">クリーム</option><option value="white">白</option><option value="dark">黒</option><option value="board">黒板</option>
         </select></label>
+        <label>名前の場所<select id="lpos">
+          <option value="in">帯の中</option><option value="after">帯の外・うしろ</option><option value="before">帯の外・まえ</option>
+        </select></label>
         <label>元号<select id="gmode">
           <option value="jp">日本</option><option value="cn">中国</option><option value="both">日本＋中国</option><option value="none">なし</option>
         </select></label>
@@ -276,7 +279,8 @@ textarea{width:100%;min-height:80px}
     </div>
 
     <div class="sec" id="sec-add" hidden>
-      <details id="presetBox" open><summary>プリセット</summary><div class="presets" id="presets"></div></details>
+      <details id="presetBox" open><summary>プリセット（人・入れ替え）</summary><div class="presets" id="presets"></div></details>
+      <details id="ppresetBox" style="margin-top:6px"><summary>プリセット（期間・できごと・今の画面に足す）</summary><div class="presets" id="ppresets"></div></details>
       <details style="margin-top:8px" id="catBox">
         <summary>分野から選ぶ</summary>
         <div class="ctrl" style="margin-top:6px">
@@ -445,6 +449,155 @@ function cnSegs(min,max){
   return out.map(g=>({...g, s:Math.max(g.s,min), e:Math.min(g.e,max)})).filter(g=>g.e>g.s);
 }
 
+/* ---------- 期間・できごとのプリセット ----------
+   b/d = 教科書でよく使う年（表示はこれ）、bs/ds = 説の一覧（帯のはしがその幅でぼける）
+   年の書き方：「1185」「前221」「1400頃」「14世紀」
+   events は1年のできごと（線） */
+const PERIOD_PRESETS = [
+ {name:'中国の王朝', items:[
+  {n:'殷', b:'前1600頃', d:'前1046', ds:['前1046','前1027']},
+  {n:'周', b:'前1046', bs:['前1046','前1027'], d:'前256'},
+  {n:'秦', b:'前221', d:'前206'},
+  {n:'前漢', b:'前202', bs:['前206','前202'], d:'8'},
+  {n:'新', b:'8', bs:['8','9'], d:'23'},
+  {n:'後漢', b:'25', d:'220'},
+  {n:'三国', b:'220', d:'280'},
+  {n:'西晋', b:'265', d:'316'},
+  {n:'東晋', b:'317', d:'420'},
+  {n:'南北朝', b:'439', bs:['420','439'], d:'589'},
+  {n:'隋', b:'581', d:'618'},
+  {n:'唐', b:'618', d:'907'},
+  {n:'五代十国', b:'907', d:'960', ds:['960','979']},
+  {n:'北宋', b:'960', d:'1127'},
+  {n:'南宋', b:'1127', d:'1279'},
+  {n:'元', b:'1271', bs:['1271','1279'], d:'1368'},
+  {n:'明', b:'1368', d:'1644'},
+  {n:'清', b:'1636', bs:['1616','1636','1644'], d:'1912', ds:['1911','1912']},
+  {n:'中華民国', b:'1912', d:'1949'},
+  {n:'中華人民共和国', b:'1949', d:'now'},
+ ]},
+ {name:'日本の政権', items:[
+  {n:'平氏政権', b:'1167', d:'1185'},
+  {n:'鎌倉幕府', b:'1185', bs:['1180','1183','1185','1190','1192'], d:'1333'},
+  {n:'建武の新政', b:'1333', d:'1336'},
+  {n:'室町幕府', b:'1336', bs:['1336','1338'], d:'1573'},
+  {n:'織豊政権', b:'1573', bs:['1568','1573'], d:'1603', ds:['1598','1600','1603']},
+  {n:'江戸幕府', b:'1603', d:'1867', ds:['1867','1868']},
+  {n:'連合国軍の占領', b:'1945', d:'1952'},
+ ]},
+ {name:'世界の大帝国', items:[
+  {n:'アケメネス朝ペルシア', b:'前550', d:'前330'},
+  {n:'ローマ帝国（東西分裂まで）', b:'前27', d:'395'},
+  {n:'西ローマ帝国', b:'395', d:'476'},
+  {n:'東ローマ帝国', b:'395', bs:['330','395'], d:'1453'},
+  {n:'フランク王国', b:'481', d:'843'},
+  {n:'ウマイヤ朝', b:'661', d:'750'},
+  {n:'アッバース朝', b:'750', d:'1258'},
+  {n:'神聖ローマ帝国', b:'962', bs:['800','962'], d:'1806'},
+  {n:'モンゴル帝国', b:'1206', d:'1368', ds:['1271','1368','1388']},
+  {n:'オスマン帝国', b:'1299', d:'1922'},
+  {n:'ムガル帝国', b:'1526', d:'1858', ds:['1857','1858']},
+  {n:'ロシア帝国', b:'1721', d:'1917'},
+ ]},
+ {name:'古代の文明', items:[
+  {n:'黄河文明', b:'前5000頃', d:'前2000頃'},
+  {n:'メソポタミア文明', b:'前3500頃', bs:['前3500頃','前3000頃'], d:'前539'},
+  {n:'エジプト文明', b:'前3000頃', d:'前30'},
+  {n:'インダス文明', b:'前2600頃', bs:['前2600頃','前2500頃'], d:'前1900頃', ds:['前1900頃','前1800頃']},
+  {n:'マヤ文明', b:'前2000頃', d:'1697'},
+  {n:'アステカ王国', b:'1325', d:'1521'},
+  {n:'インカ帝国', b:'1438', d:'1533', ds:['1533','1572']},
+ ]},
+ {name:'日本の戦い・乱', items:[
+  {n:'平将門の乱', b:'939', d:'940'},
+  {n:'治承・寿永の乱（源平合戦）', b:'1180', d:'1185'},
+  {n:'応仁の乱', b:'1467', d:'1477'},
+  {n:'大坂の陣', b:'1614', d:'1615'},
+  {n:'島原・天草一揆', b:'1637', d:'1638'},
+  {n:'戊辰戦争', b:'1868', d:'1869'},
+  {n:'日清戦争', b:'1894', d:'1895'},
+  {n:'日露戦争', b:'1904', d:'1905'},
+  {n:'日中戦争', b:'1937', d:'1945'},
+  {n:'太平洋戦争', b:'1941', d:'1945'},
+ ], events:[
+  {n:'壬申の乱', y:'672'}, {n:'保元の乱', y:'1156'}, {n:'平治の乱', y:'1159'}, {n:'承久の乱', y:'1221'},
+  {n:'文永の役', y:'1274'}, {n:'弘安の役', y:'1281'}, {n:'桶狭間の戦い', y:'1560'}, {n:'長篠の戦い', y:'1575'},
+  {n:'関ヶ原の戦い', y:'1600'}, {n:'西南戦争', y:'1877'},
+ ]},
+ {name:'世界の戦争', items:[
+  {n:'ペルシア戦争', b:'前500', d:'前449'},
+  {n:'ペロポネソス戦争', b:'前431', d:'前404'},
+  {n:'ポエニ戦争', b:'前264', d:'前146'},
+  {n:'十字軍', b:'1096', d:'1270', ds:['1270','1291']},
+  {n:'百年戦争', b:'1339', bs:['1337','1339'], d:'1453'},
+  {n:'バラ戦争', b:'1455', d:'1485'},
+  {n:'三十年戦争', b:'1618', d:'1648'},
+  {n:'七年戦争', b:'1756', d:'1763'},
+  {n:'アメリカ独立戦争', b:'1775', d:'1783'},
+  {n:'ナポレオン戦争', b:'1803', bs:['1796','1799','1803'], d:'1815'},
+  {n:'アヘン戦争', b:'1840', d:'1842'},
+  {n:'南北戦争（アメリカ）', b:'1861', d:'1865'},
+  {n:'第一次世界大戦', b:'1914', d:'1918'},
+  {n:'第二次世界大戦', b:'1939', d:'1945'},
+  {n:'朝鮮戦争', b:'1950', d:'1953'},
+  {n:'ベトナム戦争', b:'1965', bs:['1955','1960','1965'], d:'1975'},
+  {n:'冷戦', b:'1947', bs:['1945','1947'], d:'1989', ds:['1989','1991']},
+ ]},
+ {name:'日本史のできごと', events:[
+  {n:'大化の改新', y:'645'}, {n:'白村江の戦い', y:'663'}, {n:'大宝律令', y:'701'}, {n:'平城京に都を移す', y:'710'},
+  {n:'平安京に都を移す', y:'794'}, {n:'遣唐使の停止', y:'894'}, {n:'鉄砲伝来', y:'1543', note:'1542年説もある'},
+  {n:'キリスト教伝来', y:'1549'}, {n:'本能寺の変', y:'1582'}, {n:'ペリー来航', y:'1853'}, {n:'大政奉還', y:'1867'},
+  {n:'大日本帝国憲法の発布', y:'1889'}, {n:'関東大震災', y:'1923'}, {n:'ポツダム宣言の受諾', y:'1945'},
+  {n:'日本国憲法の施行', y:'1947'}, {n:'東京オリンピック', y:'1964'}, {n:'東日本大震災', y:'2011'},
+ ]},
+ {name:'世界史のできごと', events:[
+  {n:'ローマ建国（伝説）', y:'前753'}, {n:'西ローマ帝国の滅亡', y:'476'}, {n:'ヒジュラ（聖遷）', y:'622'},
+  {n:'カール大帝の戴冠', y:'800'}, {n:'マグナ・カルタ', y:'1215'}, {n:'コンスタンティノープル陥落', y:'1453'},
+  {n:'コロンブスがアメリカに到達', y:'1492'}, {n:'ルターの九十五か条の論題', y:'1517'}, {n:'アメリカ独立宣言', y:'1776'},
+  {n:'フランス革命', y:'1789'}, {n:'アウステルリッツの戦い', y:'1805'}, {n:'ロシア革命', y:'1917'}, {n:'世界恐慌', y:'1929'},
+  {n:'国際連合の成立', y:'1945'}, {n:'ベルリンの壁崩壊', y:'1989'}, {n:'ソ連の解体', y:'1991'},
+ ]},
+ {name:'世界史の時代のうごき', items:[
+  {n:'ルネサンス', b:'14世紀', d:'16世紀', ds:['1520','16世紀末'], note:'イタリアで14世紀に始まり、16世紀に西ヨーロッパへ。イタリアは1520年（ラファエロの死）までとすることが多い'},
+  {n:'大航海時代', b:'15世紀初め', d:'17世紀前半', note:'辞典によって15世紀初め〜15世紀末から、17世紀初め〜1650年ころまで'},
+  {n:'宗教改革', b:'1517', d:'1555', ds:['1555','1648'], note:'1517年ルターの九十五か条。1555年アウクスブルクの和議、1648年ウェストファリア条約'},
+  {n:'科学革命', b:'1543', d:'1687', note:'1543年コペルニクスの地動説〜1687年ニュートン『プリンキピア』'},
+  {n:'啓蒙思想の時代', b:'17世紀末', d:'18世紀末', note:'17世紀末に始まり、18世紀に全盛'},
+  {n:'産業革命（イギリス）', b:'1760頃', d:'1830', ds:['1830','1840頃']},
+  {n:'帝国主義の時代', b:'1870頃', bs:['1870頃','1880頃'], d:'1914'},
+ ]},
+];
+// 年の書き方 → [始まり, 終わり, 表示]
+function pyear(t){
+  t=String(t).trim();
+  let m;
+  if(t==='now') return [CUR,CUR,'今'];
+  if((m=/^(前)?(\d+)世紀(初め|前半|後半|末)?$/.exec(t))){
+    const c=+m[2]; let lo, hi;
+    if(m[1]){ lo=1-c*100; hi=lo+99; } else { lo=(c-1)*100+1; hi=c*100; }
+    if(m[3]==='初め') hi=lo+19; if(m[3]==='前半') hi=lo+49; if(m[3]==='後半') lo=lo+50; if(m[3]==='末') lo=hi-19;
+    return [lo,hi,t];
+  }
+  const circa=/頃$/.test(t); const y=inYear(t.replace(/頃$/,''));
+  if(y==null || Number.isNaN(y)) return null;
+  return circa ? [y-3,y+3,t] : [y,y,t];
+}
+// プリセットの1行 → 期間（帯）
+function presetPeriod(it){
+  const B=pyear(it.b), D=pyear(it.d); if(!B||!D) return null;
+  const bl = it.bs ? it.bs.map(pyear).filter(Boolean) : [B];
+  const dl = it.ds ? it.ds.map(pyear).filter(Boolean) : [D];
+  const p={type:'period', n:it.n, b:Math.min(...bl.map(x=>x[0])), d:Math.min(...dl.map(x=>x[0]))};
+  const bh=Math.max(...bl.map(x=>x[1])), dh=Math.max(...dl.map(x=>x[1]));
+  if(bh>p.b) p.b2=bh; if(dh>p.d) p.d2=dh;
+  p.bm = B[0]===B[1] ? B[0] : Math.round((B[0]+B[1])/2); p.dm = D[0]===D[1] ? D[0] : Math.round((D[0]+D[1])/2);
+  p.bl = B[2]; p.dl = it.d==='now' ? '' : D[2];
+  if(it.bs) p.bv=it.bs.map(x=>pyear(x)[2]); if(it.ds) p.dv=it.ds.map(x=>pyear(x)[2]);
+  if(it.d==='now') p.now=1;
+  if(it.note) p.note=it.note;
+  return p;
+}
+
 /* ---------- 状態 ---------- */
 let DATA = null;
 const PEOPLE = {};          // id -> 人（と、自分で足した期間 type:'period'）
@@ -453,7 +606,7 @@ let events = [];            // できごと {id,n,y}
 let selected = [];
 let colorIdx = {}, nextColor = 0, manSeq = 1;
 const SET_KEY='sbg_view_v1';
-const SET = Object.assign({orient:'h', gtick:false, gband:false, vscale:1, gmode:'jp', theme:'auto', glabel:true, eralbl:true}, lsGet(SET_KEY)||{});
+const SET = Object.assign({orient:'h', gtick:false, gband:false, vscale:1, gmode:'jp', theme:'auto', glabel:true, eralbl:true, lpos:'in'}, lsGet(SET_KEY)||{});
 
 /* ---------- 小物 ---------- */
 function $(s){ return document.querySelector(s); }
@@ -634,15 +787,35 @@ function removeId(id){
   render(); syncURL();
 }
 const cleanTxt = s => String(s).replace(/[~|]/g,' ');
+let READY=false;            // 起動が終わるまでURLは書きかえない（共有URLの中身を消さないため）
+function syncURLSoon(){ clearTimeout(syncURLSoon._t); syncURLSoon._t=setTimeout(syncURL, 400); }
+// 見た目の設定をURL用の短い文字に：向き-色-元号-ちぇっく-背景-並べ順
+function viewCode(){ const f=(SET.gtick?1:0)+(SET.gband?2:0)+(SET.glabel?4:0)+(SET.eralbl?8:0);
+  return [SET.orient, SET.theme, SET.gmode, f, $('#era').value, $('#sort').value, SET.lpos].join('-'); }
+function readViewCode(v){
+  const [o,th,g,f,era,sort,lp]=(v||'').split('-'); if(!o) return;
+  if(['in','after','before'].includes(lp)) SET.lpos=lp;
+  if(o==='h'||o==='v') SET.orient=o;
+  if(['auto','cream','white','dark','board'].includes(th)) SET.theme=th;
+  if(['jp','cn','both','none'].includes(g)) SET.gmode=g;
+  if(/^\d+$/.test(f||'')){ const n=+f; SET.gtick=!!(n&1); SET.gband=!!(n&2); SET.glabel=!!(n&4); SET.eralbl=!!(n&8); }
+  if(['jp','world','cn','none'].includes(era)) $('#era').value=era;
+  if(['birth','death','life','added'].includes(sort)) $('#sort').value=sort;
+}
 function syncURL(){
+  if(!READY) return;
   const u = new URL(location.href);
   const setp=(k,v)=>{ if(v) u.searchParams.set(k,v); else u.searchParams.delete(k); };
   setp('ids', list.join(','));
-  const man=[...list.filter(id=>/^M/.test(id)).map(id=>{const p=PEOPLE[id]; return `${id}~p~${cleanTxt(p.n)}~${p.b}~${p.d}`;}),
-             ...events.map(e=>`${e.id}~e~${cleanTxt(e.n)}~${e.y}`)];
+  const man=[...list.filter(id=>/^M/.test(id)).map(id=>{const p=PEOPLE[id]; return p.pre ? `${id}~P~${cleanTxt(p.n)}` : `${id}~p~${cleanTxt(p.n)}~${p.b}~${p.d}`;}),
+             ...events.map(e=>e.pre ? `${e.id}~Q~${cleanTxt(e.n)}` : `${e.id}~e~${cleanTxt(e.n)}~${e.y}`)];
   setp('m', man.join('|'));
   setp('t', $('#title').value.trim());
-  setp('sort', $('#sort').value==='added' ? 'added' : '');
+  u.searchParams.delete('sort');
+  setp('v', viewCode());
+  setp('sel', selected.join(','));
+  const vi = ZOOM>1.01 ? viewInfo() : null;
+  setp('z', vi ? ZOOM.toFixed(2) : ''); setp('c', vi ? String(Math.round(vi.center)) : '');
   history.replaceState(null,'',u);
 }
 function readManualParam(v){
@@ -651,18 +824,43 @@ function readManualParam(v){
     const num=+id.slice(1); if(num>=manSeq) manSeq=num+1;
     if(k==='p' && /^M\d+$/.test(id)) PEOPLE[id]={id,n,type:'period',b:+a,d:+b};
     if(k==='e' && /^E\d+$/.test(id)) events.push({id,n,y:+a});
+    if(k==='P' && /^M\d+$/.test(id)){ const it=findPresetItem(n,'items'); if(it){ const q=presetPeriod(it); if(q) PEOPLE[id]={id,...q,pre:1}; } }
+    if(k==='Q' && /^E\d+$/.test(id)){ const it=findPresetItem(n,'events'); if(it) events.push(presetEvent(it,id)); }
   }
+}
+
+function findPresetItem(n, key){ for(const ps of PERIOD_PRESETS) for(const it of (ps[key]||[])) if(it.n===n) return it; return null; }
+function presetEvent(it, id){ const Y=pyear(it.y); return {id, n:it.n, y:Y[0], note:it.note||'', pre:1}; }
+// プリセットを今の画面に足す（同じ名前のものはとばす）
+function addPresetSet(i){
+  const ps=PERIOD_PRESETS[i]; let nA=0;
+  const have=new Set([...list.map(id=>PEOPLE[id]&&PEOPLE[id].n), ...events.map(e=>e.n)]);
+  for(const it of ps.items||[]){ if(have.has(it.n)) continue; const q=presetPeriod(it); if(!q) continue;
+    const id='M'+(manSeq++); PEOPLE[id]={id,...q,pre:1}; list.push(id); nA++; }
+  for(const it of ps.events||[]){ if(have.has(it.n)) continue; events.push(presetEvent(it,'E'+(manSeq++))); nA++; }
+  events.sort((x,y)=>x.y-y.y);
+  toast(nA ? `「${ps.name}」を${nA}こ足した` : 'もう全部入ってる');
+  render(); syncURL();
 }
 
 /* ---------- 並べ順・形 ---------- */
 function bZone(p){ let a=p.b, z=p.b2??p.b; if(p.bc && z-a<2){ a-=3; z+=3; } return [a,z]; }
 function endOf(p){
+  if(p.now) return {kind:'alive', a:CUR, z:CUR, y:CUR};
   if(p.d!=null){ let a=p.d, z=p.d2??p.d; if(p.dc && z-a<2){ a-=3; z+=3; } return {kind:'dead', a, z, y:midD(p)}; }
   if(p.du || p.b < CUR-115){
     const base=Math.max((p.b2??p.b)+30, p.f2??-1e9, p.f??-1e9);
     const a=Math.min(base,CUR), z=Math.min(base+40,CUR); return {kind:'unknown', a, z, y:a};
   }
   return {kind:'alive', a:CUR, z:CUR, y:CUR};
+}
+function periodNote(p){
+  const a=[];
+  if(p.bv && p.bv.length>1) a.push('始まり 諸説：'+p.bv.join('・'));
+  if(p.dv && p.dv.length>1) a.push('終わり 諸説：'+p.dv.join('・'));
+  if(p.note) a.push(p.note);
+  if(!p.pre) a.push('自分で足した期間');
+  return a.join(' ／ ');
 }
 function life(p){ const e=endOf(p); return e.kind==='dead' ? e.y - midB(p) : null; }
 const lifeFuzzy=p=>fuzzB(p)||fuzzD(p);
@@ -693,7 +891,8 @@ function barOf(p){
   if(bz>ba) st.push(...ramp(ba, bz, false)); else st.push(`${c} 0%`);
   if(e.z>e.a) st.push(...ramp(e.a, e.z, true)); else st.push(`${c} 100%`);
   let txt;
-  if(isPeriod(p)) txt = `${fmtY(p.b)}–${fmtY(p.d)}（${p.d-p.b}年間）`;
+  if(isPeriod(p)){ const bm=p.bm??p.b, dm=p.dm??p.d, fz=p.b2!=null||p.d2!=null||/頃|世紀/.test((p.bl||'')+(p.dl||''));
+    txt = `${p.bl||fmtY(p.b)}–${p.now?'今':(p.dl||fmtY(p.d))}（${fz?'約':''}${dm-bm}年間${p.now?'〜':''}）`; }
   else {
     const lf = life(p), fz = lifeFuzzy(p);
     const dt = e.kind==='dead' ? deathTxt(p) : e.kind==='alive' ? '存命' : (p.du?'不明':'?');
@@ -701,7 +900,7 @@ function barOf(p){
   }
   const cls = ['bar', e.kind, bz>ba?'fb':'', e.kind==='dead'&&e.z>e.a?'fd':'', isPeriod(p)?'period':''].join(' ');
   const lbAt = bz>ba && (e.a-bz) > w*0.35 ? pc(bz) : '0%';
-  return {e, left, right, st, txt, cls, lbAt, note: isPeriod(p)?'自分で足した期間':noteOf(p),
+  return {e, left, right, st, txt, cls, lbAt, note: isPeriod(p)?periodNote(p):noteOf(p),
     ageB: midB(p), ageF: isPeriod(p)?'p':(lifeFuzzy(p)?'1':'0'), ua: e.kind==='unknown'?e.a:''};
 }
 
@@ -798,7 +997,7 @@ function render(){
     return `<div class="gseg ${g.lane==='all'?'':g.lane} ${(gk++)%2?'alt':''}" style="${extra||''}${box(g.s,g.e)}" data-pop="${esc(nm)}">${esc(g.n)}</div>`; };
   const genRows = bands.map(b=>`<div class="arow gen">${b.segs.map(g=>segHTML(g)).join('')}</div>`).join('');
   const tickLbl = ticks.map(t=>{ const gt=tickG(t); return `<div class="tick" style="${pos(t)}">${fmtY(t)}${gt.map(x=>`<small>${esc(x)}</small>`).join('')}</div>`; }).join('');
-  const evLbl = events.map(ev=>`<div class="evlb" style="${pos(ev.y)}" title="${esc(fmtY(ev.y)+'年 '+ev.n)}">${esc(fmtY(ev.y))} ${esc(ev.n)}</div>`).join('');
+  const evLbl = events.map(ev=>`<div class="evlb" style="${pos(ev.y)}" title="${esc(fmtY(ev.y)+'年 '+ev.n+(ev.note?'（'+ev.note+'）':''))}">${esc(fmtY(ev.y))} ${esc(ev.n)}</div>`).join('');
 
   const handle = p => `<span class="grip">⋮⋮</span><button class="x" title="消す" data-rm="${p.id}">×</button>`;
   const barHTML = (p,g) => `<div class="${g.cls}" data-sel="${p.id}" style="${box(g.left,g.right)};background:linear-gradient(${V?'180deg':'90deg'}, ${g.st.join(', ')})" title="${esc(p.n)} ${esc(g.txt)}${g.note?'&#10;'+esc(g.note):''}"><span class="lb" style="${V?'top':'left'}:${g.lbAt}"><b>${esc(p.n)}</b>${esc(g.txt)}</span></div>
@@ -849,7 +1048,7 @@ function render(){
       const pos = (anchor.y-min)/(max-min)*LEN - anchor.f*vis;
       if(V) sc.scrollTop=Math.max(0,pos); else sc.scrollLeft=Math.max(0,pos); }
   }
-  drawMini(bars, min, max); onScroll();
+  drawMini(bars, min, max); onScroll(); syncURLSoon();
 }
 
 function onScroll(){
@@ -943,20 +1142,21 @@ function fitLabels(){
     const tr = V ? row : row.querySelector('.track');
     if(!bar||!lb||!lbo) return;
     lb.style.visibility=''; lbo.style.display='none';
+    const outside = SET.lpos!=='in';
     const fits = V ? (lb.offsetTop + lb.scrollHeight <= bar.clientHeight + 1) : (lb.offsetLeft + lb.scrollWidth <= bar.clientWidth + 1);
-    if(fits) return;
+    if(fits && !outside) return;
     lbo.style.display='flex';
-    if(!V){
-      const w=lbo.offsetWidth, R=bar.offsetLeft+bar.offsetWidth+5;
-      if(R + w <= tr.clientWidth) lbo.style.left=R+'px';
-      else if(bar.offsetLeft - w - 5 >= 0) lbo.style.left=(bar.offsetLeft - w - 5)+'px';
-      else { lbo.style.display='none'; return; }
-    } else {
-      const h=lbo.offsetHeight, B=bar.offsetTop+bar.offsetHeight+5;
-      if(B + h <= tr.clientHeight) lbo.style.top=B+'px';
-      else if(bar.offsetTop - h - 5 >= 0) lbo.style.top=(bar.offsetTop - h - 5)+'px';
-      else { lbo.style.display='none'; return; }
-    }
+    // うしろ（横：右、縦：下）とまえ（横：左、縦：上）。入らない側なら反対へ
+    const size = V ? lbo.offsetHeight : lbo.offsetWidth;
+    const st = V ? bar.offsetTop : bar.offsetLeft, len = V ? bar.offsetHeight : bar.offsetWidth;
+    const room = V ? tr.clientHeight : tr.clientWidth;
+    const after = st+len+5, before = st-size-5;
+    const okA = after+size <= room, okB = before >= 0;
+    let at = null;
+    if(SET.lpos==='before') at = okB ? before : okA ? after : null;
+    else at = okA ? after : okB ? before : null;
+    if(at==null){ lbo.style.display='none'; return; }     // どっちにも入らないときは帯の中のまま
+    if(V) lbo.style.top=at+'px'; else lbo.style.left=at+'px';
     lb.style.visibility='hidden';
   });
 }
@@ -1086,7 +1286,7 @@ $('#chart').addEventListener('click', ev=>{
     const id = s.dataset.sel || s.dataset.id;
     if(selected.includes(id)) selected=selected.filter(x=>x!==id);
     else { selected.push(id); if(selected.length>2) selected.shift(); }
-    render();
+    render(); syncURLSoon();
   }
 });
 
@@ -1145,6 +1345,10 @@ async function resolveMany(names, my, onFound){
 
 /* ---------- プリセット ---------- */
 function presetList(){ return (DATA && DATA.presets && DATA.presets.length) ? DATA.presets : BUILTIN_PRESETS; }
+function drawPPresets(){
+  $('#ppresets').innerHTML = PERIOD_PRESETS.map((p,i)=>`<button data-ppi="${i}">${esc(p.name)}</button>`).join('');
+}
+$('#ppresets').addEventListener('click', ev=>{ const b=ev.target.closest('[data-ppi]'); if(b) addPresetSet(+b.dataset.ppi); });
 function drawPresets(){
   $('#presets').innerHTML = '<span class="lbl" style="align-self:center">プリセット：</span>' +
     presetList().map((p,i)=>`<button data-pi="${i}">${esc(p.name)}</button>`).join('');
@@ -1196,7 +1400,7 @@ function upsertManual(editId, name, a, b, q){
   if(editId){
     const wasEv=/^E/.test(editId);
     if(wasEv && isEv){ Object.assign(events.find(x=>x.id===editId), {n:name, y:a}); }
-    else if(!wasEv && !isEv){ Object.assign(PEOPLE[editId], {n:name, b:a, d:b}); }
+    else if(!wasEv && !isEv){ const q=PEOPLE[editId]; ['b2','d2','bm','dm','bl','dl','bv','dv','now','pre','bc','dc'].forEach(k=>delete q[k]); Object.assign(q, {n:name, b:a, d:b}); }
     else {   // 線⇔帯が入れかわる
       const old = wasEv ? events.find(x=>x.id===editId) : PEOPLE[editId]; q = q || (old && old.q);
       const idx = wasEv ? -1 : list.indexOf(editId);
@@ -1351,19 +1555,21 @@ function applySet(){
   document.querySelectorAll('#orient button').forEach(b=>b.classList.toggle('on', b.dataset.o===SET.orient));
   $('#gtick').checked = SET.gtick; $('#gband').checked = SET.gband;
   $('#gmode').value = SET.gmode; $('#theme').value = SET.theme;
-  $('#glabel').checked = SET.glabel; $('#eralbl').checked = SET.eralbl;
+  $('#glabel').checked = SET.glabel; $('#eralbl').checked = SET.eralbl; $('#lpos').value = SET.lpos;
   document.documentElement.dataset.theme = SET.theme;
-  lsSet(SET_KEY, SET);
+  if(READY) lsSet(SET_KEY, SET);   // 共有URLで開いたときの設定は、その人の保存設定に上書きしない
+  syncURLSoon();
 }
 $('#orient').addEventListener('click', ev=>{ const b=ev.target.closest('[data-o]'); if(!b) return; SET.orient=b.dataset.o; applySet(); render(); });
 $('#gtick').addEventListener('change', ()=>{ SET.gtick=$('#gtick').checked; applySet(); render(); });
 $('#gband').addEventListener('change', ()=>{ SET.gband=$('#gband').checked; applySet(); render(); });
+$('#lpos').addEventListener('change', ()=>{ SET.lpos=$('#lpos').value; applySet(); render(); });
 $('#gmode').addEventListener('change', ()=>{ SET.gmode=$('#gmode').value; applySet(); render(); });
 $('#glabel').addEventListener('change', ()=>{ SET.glabel=$('#glabel').checked; applySet(); });
 $('#eralbl').addEventListener('change', ()=>{ SET.eralbl=$('#eralbl').checked; applySet(); render(); });
 $('#theme').addEventListener('change', ()=>{ SET.theme=$('#theme').value; applySet(); render(); });
 $('#sort').addEventListener('change', ()=>{ render(); syncURL(); });
-$('#era').addEventListener('change', render);
+$('#era').addEventListener('change', ()=>{ render(); syncURLSoon(); });
 $('#title').addEventListener('input', ()=>{ clearTimeout($('#title')._t); $('#title')._t=setTimeout(syncURL,300); });
 $('#clear').addEventListener('click', ()=>{ runId++; list.filter(id=>/^M/.test(id)).forEach(id=>delete PEOPLE[id]);
   list=[]; events=[]; selected=[]; colorIdx={}; nextColor=0; render(); syncURL(); });
@@ -1374,7 +1580,7 @@ $('#share').addEventListener('click', async ()=>{
 
 /* ---------- 表示の保存・読み込み ---------- */
 function snapshot(){
-  const item = id => { const p=PEOPLE[id]; if(!p) return null; const o=pickFields(p); if(p.type) o.type=p.type; return o; };
+  const item = id => { const p=PEOPLE[id]; if(!p) return null; if(isPeriod(p)) return {...p}; const o=pickFields(p); if(p.type) o.type=p.type; return o; };
   return {app:'seibotsunen-graph', version:1, saved:new Date().toISOString(),
     title:$('#title').value.trim(), order:list.slice(), items:list.map(item).filter(Boolean), events:events.map(e=>({...e})),
     selected:selected.slice(), settings:{...SET, sort:$('#sort').value, era:$('#era').value}};
@@ -1401,7 +1607,7 @@ $('#loadFile').addEventListener('change', async ev=>{
     list=(d.order||[]).filter(id=>PEOPLE[id]); selected=(d.selected||[]).filter(id=>list.includes(id));
     colorIdx={}; nextColor=0;
     const s=d.settings||{};
-    Object.assign(SET, {orient:s.orient||'h', gtick:!!s.gtick, gband:!!s.gband, gmode:s.gmode||'jp', theme:s.theme||SET.theme, glabel:s.glabel!==false, eralbl:s.eralbl!==false});
+    Object.assign(SET, {orient:s.orient||'h', gtick:!!s.gtick, gband:!!s.gband, gmode:s.gmode||'jp', theme:s.theme||SET.theme, glabel:s.glabel!==false, eralbl:s.eralbl!==false, lpos:s.lpos||'in'});
     if(s.sort) $('#sort').value=s.sort; if(s.era) $('#era').value=s.era;
     $('#title').value=d.title||'';
     applySet(); render(); syncURL(); toast('読み込んだ！');
@@ -1422,16 +1628,21 @@ $('#dataFile').addEventListener('change', async ev=>{
 });
 
 (async function init(){
-  applySet(); applyUI(); syncManForm(); drawPresets(); drawCats();
+  applySet(); applyUI(); syncManForm(); drawPresets(); drawPPresets(); drawCats();
   try{ const r = await fetch(DATA_URL,{cache:'no-cache'}); if(r.ok) useData(await r.json()); }catch(e){}
   if(!DATA) $('#dataStat').textContent = '手元データなし（Wikidataから直接さがす）';
   const sp = new URL(location.href).searchParams;
   readManualParam(sp.get('m'));
   if(sp.get('t')) $('#title').value=sp.get('t');
-  if(sp.get('sort')==='added') $('#sort').value='added';
+  if(sp.get('sort')==='added') $('#sort').value='added';     // 古い共有URL
+  if(sp.get('v')){ readViewCode(sp.get('v')); applySet(); }
   const ids = (sp.get('ids')||'').split(',').filter(x=>/^(Q|M)\d+$/.test(x));
   if(ids.length){ await ensureIds(ids); ids.forEach(id=>add(PEOPLE[id],true)); }
+  selected = (sp.get('sel')||'').split(',').filter(id=>list.includes(id)).slice(0,2);
+  const z=+sp.get('z'), c=+sp.get('c');
+  if(z>1 && Number.isFinite(c) && sp.get('c')!==null){ ZOOM=z; pendingAnchor={y:c, f:.5}; }
   render();
+  READY=true; syncURL();
 })();
 </script>
 </body>
