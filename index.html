@@ -158,6 +158,14 @@ textarea{width:100%;min-height:80px}
 /* ===== 横 ===== */
 .H{padding:0;overflow:hidden}
 .H .hscroll{overflow:auto;max-height:calc(100vh - 30px);touch-action:pan-x pan-y}
+/* すくろーるばーをいつも見えるように（Macの「使うときだけ出る」でも消えない） */
+.hscroll,.vscroll{scrollbar-width:auto;scrollbar-color:var(--sub) var(--bg)}
+.hscroll::-webkit-scrollbar,.vscroll::-webkit-scrollbar{width:12px;height:12px;background:var(--bg)}
+.hscroll::-webkit-scrollbar-thumb,.vscroll::-webkit-scrollbar-thumb{background:var(--sub);border-radius:8px;border:3px solid var(--bg)}
+.hscroll::-webkit-scrollbar-thumb:hover,.vscroll::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+.hscroll::-webkit-scrollbar-corner,.vscroll::-webkit-scrollbar-corner{background:var(--bg)}
+.panning,.panning *{cursor:grabbing!important;user-select:none}
+.zoomed .hscroll,.zoomed .vscroll{cursor:grab}
 .H .hinner{position:relative;padding:0 10px 12px 0}
 .H .axis{display:flex;position:sticky;top:0;background:var(--panel);z-index:5;padding-top:4px}
 .H .axis .namecol{position:sticky;left:0;z-index:6;background:var(--panel)}
@@ -247,7 +255,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.15</span><span class="lbl" id="dataStat"></span></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.16</span><span class="lbl" id="dataStat"></span></header>
 <div class="wrap">
 
   <div class="panel">
@@ -1016,6 +1024,7 @@ function render(){
   const anchor = pendingAnchor || (prev ? {y:prev.center, f:.5, V:prev.sc && geo.V} : null);
   pendingAnchor = null;
   document.body.classList.toggle('fold', !UI.names);
+  document.body.classList.toggle('zoomed', ZOOM>1.01);
   $('#namesBtn').setAttribute('aria-pressed', UI.names?'true':'false');
   chart.className = 'chart '+(V?'V':'H');
   const ps = sorted();
@@ -1291,7 +1300,7 @@ function yearLabel2(y){
   return (y<=0?'紀元前'+(1-y):y)+'年'+(a.length?`（${a.join('｜')}）`:'');
 }
 function onMove(ev){
-  if(!geo || drag) return;
+  if(!geo || drag || (pan && pan.on)) return;
   const V = geo.V;
   const base = V ? $('#vbody') : $('#tkrow'); if(!base) return;
   const r = base.getBoundingClientRect();
@@ -1322,6 +1331,23 @@ window.addEventListener('scroll', ()=>hidePop(), {passive:true});
 
 /* ---------- 名前をつまんで並べ替え ---------- */
 let drag=null, justDragged=false;
+// まうすで掴んでぐいっ（すまほは指でそのまま動くので、まうすだけ）
+let pan=null;
+$('#chart').addEventListener('pointerdown', ev=>{
+  if(ev.pointerType!=='mouse' || ev.button!==0) return;
+  if(ev.target.closest('.grip,.gseg,.evlb,button,input,[contenteditable]')) return;
+  const sc=ev.target.closest('.hscroll,.vscroll'); if(!sc) return;
+  pan={sc, x0:ev.clientX, y0:ev.clientY, l0:sc.scrollLeft, t0:sc.scrollTop, on:false, pid:ev.pointerId};
+});
+document.addEventListener('pointermove', ev=>{
+  if(!pan || ev.pointerId!==pan.pid) return;
+  const dx=ev.clientX-pan.x0, dy=ev.clientY-pan.y0;
+  if(!pan.on){ if(Math.hypot(dx,dy)<5) return; pan.on=true; document.body.classList.add('panning'); hideCursor(); try{ pan.sc.setPointerCapture(pan.pid); }catch(e){} }
+  pan.sc.scrollLeft=pan.l0-dx; pan.sc.scrollTop=pan.t0-dy;
+});
+function endPan(){ if(!pan) return; if(pan.on){ justDragged=true; setTimeout(()=>justDragged=false,50); document.body.classList.remove('panning'); } pan=null; }
+document.addEventListener('pointerup', endPan);
+document.addEventListener('pointercancel', endPan);
 $('#chart').addEventListener('pointerdown', ev=>{
   const g=ev.target.closest('.grip'); if(!g) return;   // 並べ替えは「⋮⋮」をつまんだときだけ
   const h=g.closest('.dh'); if(!h) return; ev.preventDefault();
