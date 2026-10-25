@@ -157,7 +157,20 @@ textarea{width:100%;min-height:80px}
 .grip.cg:hover{background:var(--c);transform:scale(1.18)}
 .dh .grip.cg{opacity:1;letter-spacing:0}
 .V .vhead .grip.cg{margin:2px auto}
-.legend{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 6px;align-items:center}
+.legend{margin:2px 0 6px}
+.legend .ltools{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.legend .lhint{font-size:calc(12px*var(--fs));color:var(--sub);margin-top:6px}
+.cedit .legend{border:1.5px dashed var(--accent);border-radius:10px;padding:8px 10px;background:var(--panel)}
+.legend .lgw{display:inline-flex;align-items:center}
+.legend .lged{border:0;background:none;color:var(--sub);padding:0 3px 0 2px;cursor:pointer;font-size:calc(13px*var(--fs))}
+.legend .lg.on,.legend .lgadd.on,.legend .cpick.on{outline:2.5px solid var(--accent);outline-offset:1px}
+.legend .lg small{color:var(--sub);font-size:.85em}
+.legend .lg.ro{cursor:default}
+.legend .bsw{width:calc(20px*var(--fs));height:calc(20px*var(--fs));border-radius:50%;border:0;padding:0;cursor:pointer}
+.legend .bsw.on{outline:2.5px solid var(--ink);outline-offset:1.5px}
+.legend .cpick{display:inline-flex;align-items:center;gap:4px;font-size:calc(12px*var(--fs));color:var(--sub);border-radius:6px;padding:0 2px}
+.legend .cpick input{width:30px;height:24px;padding:0;border:1px solid var(--line);border-radius:6px;background:none}
+.brushing #chart .bar,.brushing #chart .dh,.brushing #chart .row{cursor:copy}
 .legend .lg{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:2px 10px 2px 6px;font-size:calc(12.5px*var(--fs));color:var(--ink);cursor:pointer}
 .legend .lg i{width:calc(12px*var(--fs));height:calc(12px*var(--fs));border-radius:50%;display:inline-block}
 .legend .lg.act{border-color:var(--accent)}
@@ -282,10 +295,29 @@ textarea{width:100%;min-height:80px}
 .V .lbo{left:calc(6px*var(--fs));width:calc(24px*var(--fs));writing-mode:vertical-rl;justify-content:flex-start;line-height:calc(24px*var(--fs))}
 .V .age{left:2px;transform:translateY(-120%)}
 @media (max-width:640px){:root{--namew:96px}}
+
+.helpBtn{margin-left:auto;align-self:center;font-size:13px;padding:5px 12px;border-radius:999px}
+#help{border:1px solid var(--line);border-radius:14px;padding:0;background:var(--panel);color:var(--ink);width:min(720px,calc(100vw - 24px));max-height:min(86vh,900px);box-shadow:0 16px 48px rgba(0,0,0,.3)}
+#help::backdrop{background:rgba(0,0,0,.45)}
+#help .hwrap{display:flex;flex-direction:column;max-height:min(86vh,900px)}
+#help .hhead{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 6px}
+#help h2{margin:0;font-size:19px}
+#help .hx{border:0;background:none;font-size:24px;line-height:1;color:var(--sub);cursor:pointer;padding:2px 8px}
+#help .htoc{display:flex;flex-wrap:wrap;gap:6px;padding:4px 18px 10px;border-bottom:1px solid var(--line)}
+#help .htoc a{font-size:12.5px;color:var(--ink);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:2px 10px;background:var(--bg)}
+#help .htoc a:hover{border-color:var(--accent)}
+#help .hbody{overflow:auto;padding:6px 18px 18px;font-size:14px;line-height:1.75}
+#help h3{font-size:15.5px;margin:16px 0 4px;padding-left:8px;border-left:4px solid var(--accent)}
+#help ul{margin:4px 0;padding-left:1.3em}
+#help li{margin:3px 0}
+#help ul ul{margin:2px 0}
+#help p{margin:4px 0}
+#help a{color:var(--accent)}
+@media (max-width:640px){ #help .hbody{font-size:13.5px} .helpBtn{font-size:12px;padding:4px 10px} }
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.20</span><span class="lbl" id="dataStat"></span></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.22</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
 <div class="wrap">
 
   <div class="panel">
@@ -330,13 +362,18 @@ textarea{width:100%;min-height:80px}
         <label>文字の大きさ<select id="fs">
           <option value="0.85">小</option><option value="1">中</option><option value="1.25">大</option><option value="1.6">特大</option>
         </select></label>
-        <label>帯の色分け<select id="cmode">
-          <option value="group">まとまりごと（自動で色分け）</option><option value="each">ひとりずつ（自分で色をえらぶ）</option><option value="name">なし（ばらばらの色）</option>
-        </select></label>
         <label>名前の場所<select id="lpos">
           <option value="in">帯の中</option><option value="after">帯の外・うしろ</option><option value="before">帯の外・まえ</option>
         </select></label>
       </div>
+      <div class="sh">帯の色分け</div>
+      <div class="setgrid">
+        <label>色分け<select id="cmode">
+          <option value="group">まとまりごと（自動で色分け）</option><option value="each">ひとりずつ（自分で色をえらぶ）</option><option value="name">なし（ばらばらの色）</option>
+        </select></label>
+      </div>
+      <div class="ctrl" style="margin-top:6px"><label class="ck"><input type="checkbox" id="showLg"> 凡例をグラフに出す（画像にも写る）</label></div>
+      <div class="lbl" style="margin-top:4px">設定を開いているあいだは、グラフの上に色づけの道具が出る（閉じるとかくれる）</div>
       <div class="sh">時代・元号</div>
       <div class="setgrid">
         <label>背景の時代<select id="era">
@@ -412,6 +449,120 @@ textarea{width:100%;min-height:80px}
 <div class="gpop" id="gpop"></div>
 <div class="evpop" id="evpop"></div>
 <div class="cpop" id="cpop"></div>
+<dialog id="help" aria-labelledby="helpT">
+  <div class="hwrap">
+  <div class="hhead"><h2 id="helpT">生没年グラフの使い方</h2><button class="hx" id="helpX" title="とじる（Esc）">×</button></div>
+  <nav class="htoc">
+    <a href="#h-what">これは何？</a><a href="#h-add">並べる</a><a href="#h-see">見る</a><a href="#h-sort">並べ替え・消す</a><a href="#h-color">色分け</a>
+    <a href="#h-dur">📏長さくらべ</a><a href="#h-era">時代・元号</a><a href="#h-look">見た目</a><a href="#h-save">共有・保存</a><a href="#h-year">年の書き方</a><a href="#h-data">データ</a>
+  </nav>
+  <div class="hbody">
+
+  <section id="h-what"><h3>これは何？</h3>
+    <p>有名な人の名前を入れると、生まれてから亡くなるまでを横向きの帯にして並べるグラフ。「この2人、同じ時代に生きてたの？」がひと目でわかる。</p>
+    <p>王朝や戦争みたいな「期間」や、1年だけの「できごと」もいっしょに並べられる。</p>
+  </section>
+
+  <section id="h-add"><h3>並べる</h3>
+    <ul>
+      <li><b>検索</b>：いちばん上の入力らんに名前を打つと候補が出る。押すとすぐ足される。人だけじゃなく、できごと（例：応仁の乱）や期間、放射性物質の半減期も出る。</li>
+      <li><b>プリセット（人・入れ替え）</b>：「幕末・明治維新」などを押すと、今の画面と入れ替わってその人たちが並ぶ。</li>
+      <li><b>プリセット（期間・できごと）</b>：王朝・戦争・時代のうごきなどを、今の画面に足す。</li>
+      <li><b>まとめて追加</b>：「＋ 足す」の中。1行に1人ずつ名前を書いて「追加する」。</li>
+      <li><b>自分で追加</b>：名前と始まり・終わりの年を入れると期間（帯）になる。終わりを空けると、その年だけのできごと（線）になる。</li>
+      <li><b>分野から選ぶ</b>：データファイルがあるときだけ出る。分野ごとの有名な人から選べる。</li>
+    </ul>
+  </section>
+
+  <section id="h-see"><h3>見る</h3>
+    <ul>
+      <li><b>なぞる</b>：グラフの上でマウスを動かす（指でさわる）と、その年と、その年に各人が何歳だったかが出る。</li>
+      <li><b>重なりを調べる</b>：帯を2本クリックすると、同時に生きてた期間（重なってた期間）が出る。もう一度押すと選ぶのをやめる。</li>
+      <li><b>拡大・縮小</b>：「−」「＋」「全体」ボタン、ctrl＋ほいーる、すまほは2本指。</li>
+      <li><b>動かす</b>：まうすでグラフをつかんで引っぱる。すまほは指でそのまま。上の細長い全体図の枠をつまんで動かしてもいい。枠のはしを引っぱると拡大・縮小。</li>
+      <li><b>向き</b>：「↔️」が横向き、「↕️」が縦向き（上が昔）。</li>
+      <li><b>名前の列</b>：左に名前の列を出す・たたむ。</li>
+      <li><b>できごとの線</b>：上の名前を押すと、説明と「消す」が出る。</li>
+    </ul>
+  </section>
+
+  <section id="h-sort"><h3>並べ替え・消す</h3>
+    <ul>
+      <li><b>並べ順</b>：設定の「並べ順」で、生まれ順・没年順・享年順・自分で並べた順。</li>
+      <li><b>自分で並べ替え</b>：名前のよこの <b>●</b>（色分けが「なし」のときは <b>⋮⋮</b>）をつまんで上下に動かす。</li>
+      <li><b>消す</b>：名前の列を出して、名前にのせると出る「×」を押す。全部消すときは「…」の中の「全部消す」。</li>
+    </ul>
+  </section>
+
+  <section id="h-color"><h3>色分け</h3>
+    <p>設定の「帯の色分け」で3つから選ぶ。色をいじる道具は、<b>「⚙ 設定」を開いているあいだだけ</b>グラフの上に出る（名前のよこも ⋮⋮ が ● に変わる）。閉じるとかくれて、色はそのまま。</p>
+    <ul>
+      <li><b>まとまりごと（自動）</b>：プリセットやまとめて追加で足したものが、ひとつの「まとまり」になる。まとまりごとに赤系・青系…と色が自動で配られ、まとまりの中は少しずつちがう色になる。
+        <ul>
+          <li><b>まとまりから決める</b>：道具のまとまりを押すと「筆」を持つ。そのまま帯をポチポチ押すと、そのまとまりに入る。もう一度押すか Esc で筆をおく。</li>
+          <li><b>帯から決める</b>：筆を持ってないとき、帯の ● を押すと行き先を選べる。</li>
+          <li>「＋ まとまり」で新しいまとまりを作る。✎ で名前と系統の色を変える。</li>
+        </ul></li>
+      <li><b>ひとりずつ</b>：色を押して筆を持ち、帯をポチポチ押すとその色になる。● を押して1本ずつ選んでもいい。決めてない人はまとまりの色のまま。</li>
+      <li><b>なし</b>：一本ずつばらばらの色。</li>
+      <li><b>凡例</b>：「凡例をグラフに出す」にチェックすると、設定を閉じても凡例が出る。画像にも写る。</li>
+    </ul>
+  </section>
+
+  <section id="h-dur"><h3>📏 長さくらべ</h3>
+    <p>「📏」ボタンで切りかえ。年表とちがって、どの帯も0から始まり、長さだけをくらべる。</p>
+    <ul>
+      <li>並べている人は<b>享年</b>で出る。</li>
+      <li>プリセット「生き物の寿命」「放射性物質の半減期」がある。生き物は、濃い帯がふつうの寿命、うすく伸びた先が最長記録。</li>
+      <li>検索で同位体（例：セシウム137）を打つと、Wikidataの半減期を足せる。</li>
+      <li><b>単位</b>：自動・秒〜億年・対数。短いものと長いものをまぜたら「対数」にすると全部見える。</li>
+      <li>帯にのせると、数字の出典が出る。</li>
+    </ul>
+  </section>
+
+  <section id="h-era"><h3>時代・元号</h3>
+    <ul>
+      <li><b>背景の時代</b>：日本の時代・世界の時代・中国の王朝を、うすい背景にする。</li>
+      <li><b>元号</b>：日本・中国・両方。南北朝のときは南朝・北朝が分かれて出る。</li>
+      <li>「なぞった年に元号」「目盛りに元号」「元号の帯」でどこに出すかを選べる。元号の帯の細い線は、押すと名前と年が出る。</li>
+    </ul>
+  </section>
+
+  <section id="h-look"><h3>見た目</h3>
+    <ul>
+      <li><b>題名</b>：入れるとグラフの上に出る。グラフの上の題名をそのまま書きかえてもいい。</li>
+      <li><b>色</b>（白・黒・黒板・クリーム）、<b>フォント</b>、<b>文字の大きさ</b>、<b>名前の場所</b>（帯の中・外）。</li>
+    </ul>
+  </section>
+
+  <section id="h-save"><h3>共有・保存</h3>
+    <ul>
+      <li><b>共有URL</b>：並べたものや設定は、いつもURLに入っている。「…」→「共有URLをコピー」で送れば、相手も同じグラフが見られる。</li>
+      <li><b>画像</b>：「…」→「画像で保存」（見えてる範囲／全体）か「画像をコピー」。</li>
+      <li><b>保存（JSON）</b>：ファイルにとっておいて、「読み込み（JSON）」でもどせる。自分で足した期間や色もそのまま。</li>
+    </ul>
+  </section>
+
+  <section id="h-year"><h3>年の書き方・ぼかし</h3>
+    <ul>
+      <li>紀元前は「前221」。「1400頃」「14世紀」「16世紀末」も使える。</li>
+      <li>生まれた年・亡くなった年に<b>説がいくつかある</b>ときや「頃」のときは、帯のはしがぼける。</li>
+      <li>亡くなった年がわからない人は、帯の終わりがだんだん消える。</li>
+      <li>Wikidataで「あやしい」とされている年しかないときも、ぼかして「諸説あり」として出す。</li>
+    </ul>
+  </section>
+
+  <section id="h-data"><h3>データ</h3>
+    <ul>
+      <li>人の生没年は <a href="https://www.wikidata.org/" target="_blank" rel="noopener">Wikidata</a>（CC0）から、その場で取ってくる。まちがいがあることもある。</li>
+      <li>期間・できごと・寿命・半減期のプリセットは、教科書・辞典・環境省などの資料をもとに作った。帯にのせると、メモや出典が出る。</li>
+      <li>同じ場所に seibotsunen-data.json を置くと、人の検索が速くなって「分野から選ぶ」も使える。</li>
+    </ul>
+  </section>
+  </div>
+  </div>
+</dialog>
+
 
 <script>
 'use strict';
@@ -906,23 +1057,57 @@ function col(id, a=1){
   return `hsl(${(+c.h).toFixed(1)} ${S} ${L}${al})`;
 }
 // 名前の横の「●」（つまむと並べ替え、押すと色）
+let BRUSH=null;   // 筆：{g}（まとまり）か {e:色|'reset'}（ひとりずつ）
+// 色づけ中＝設定を開いてるとき（画像を作ってるときはちがう）
+function editing(){ return !!UI.set && SET.cmode!=='name' && !$('#cap').classList.contains('capturing'); }
 function gripHTML(id, hidden){
-  if(SET.cmode==='name') return `<span class="grip"${hidden?' style="visibility:hidden"':''}>⋮⋮</span>`;
+  if(!editing()) return `<span class="grip"${hidden?' style="visibility:hidden"':''}>⋮⋮</span>`;
   return `<span class="grip cg${hidden?' nodrag':''}" data-cp="${id}" style="--c:${col(id)}" title="${SET.cmode==='each'?'押すと色をえらべる':'押すとまとまりを変えられる'}${hidden?'':'・つまむと並べ替え'}"></span>`;
 }
 
 /* ---- 凡例（まとまりごとのとき） ---- */
 function drawLegend(ids){
-  const el=$('#legend');
-  if(SET.cmode!=='group' || !ids.length){ el.hidden=true; el.innerHTML=''; return; }
-  const cnt={}; ids.forEach(id=>{ cnt[GRP[id]]=(cnt[GRP[id]]||0)+1; });
-  const gs=GROUPS.filter(G=>cnt[G.g] || G.g===ACTIVE);
+  const el=$('#legend'), ed=editing();
+  document.body.classList.toggle('cedit', ed);
+  document.body.classList.toggle('brushing', ed && !!BRUSH);
+  if(!ed) BRUSH=null;
+  const show = ids.length && SET.cmode!=='name' && (ed || (SET.legend && SET.cmode==='group'));
+  if(!show){ el.hidden=true; el.innerHTML=''; return; }
   el.hidden=false;
-  el.innerHTML = gs.map(G=>{ const first=ids.find(id=>GRP[id]===G.g);
-    const c = first ? col(first) : 'var(--line)';
-    return `<button class="lg${G.g===ACTIVE?' act':''}${cnt[G.g]?'':' empty'}" data-lg="${G.g}" title="押すと名前・色を変えられる${G.g===ACTIVE?'（1人ずつ足すと、ここに入る）':''}"><i style="background:${c}"></i>${esc(G.n)}${cnt[G.g]?'':'（まだ空）'}</button>`; }).join('')
-    + `<button class="lgadd" id="lgAdd" title="新しいまとまりを作って、これから1人ずつ足す人をそこに入れる">＋ まとまり</button>`;
+  const cnt={}; ids.forEach(id=>{ cnt[GRP[id]]=(cnt[GRP[id]]||0)+1; });
+  const gcol = g => { const first=ids.find(id=>GRP[id]===g); return first ? col(first) : 'var(--line)'; };
+  if(!ed){   // 見るだけの凡例（画像にも写る）
+    el.innerHTML = `<div class="ltools">${GROUPS.filter(G=>cnt[G.g]).map(G=>`<span class="lg ro"><i style="background:${gcol(G.g)}"></i>${esc(G.n)}</span>`).join('')}</div>`;
+    return;
+  }
+  let tools, hint;
+  if(SET.cmode==='group'){
+    const gs=GROUPS.filter(G=>cnt[G.g] || G.g===ACTIVE || (BRUSH&&BRUSH.g===G.g));
+    tools = gs.map(G=>`<span class="lgw"><button class="lg${BRUSH&&BRUSH.g===G.g?' on':''}${cnt[G.g]?'':' empty'}" data-brg="${G.g}" title="押すと筆を持つ（帯を押すとこのまとまりに入る）"><i style="background:${gcol(G.g)}"></i>${esc(G.n)}${cnt[G.g]?` <small>${cnt[G.g]}</small>`:'（まだ空）'}</button><button class="lged" data-lg="${G.g}" title="名前・色を変える">✎</button></span>`).join('')
+      + `<button class="lgadd" id="lgAdd" title="新しいまとまりを作って筆を持つ">＋ まとまり</button>`;
+    const B = BRUSH && grpOf(BRUSH.g);
+    hint = B ? `🖌 「${esc(B.n)}」の筆を持ってる：帯を押すと入る（もう一度押すか Esc で筆をおく）`
+             : 'まとまりを押して筆を持つ → 帯をポチポチ押すと入る ／ 帯の ● を押して1本ずつ行き先を選んでもいい ／ ✎で名前・色';
+  } else {
+    const cur = BRUSH && BRUSH.e;
+    tools = EACH_SW.map((c,i)=>{ const st = `hsl(${c.h} ${c.s!=null?c.s+'%':'var(--bs)'} calc(var(--bl) ${(c.dl||0)<0?'-':'+'} ${Math.abs(c.dl||0)}%))`;
+        return `<button class="bsw${cur&&cur.i===i?' on':''}" data-bre="${i}" style="background:${st}"></button>`; }).join('')
+      + `<label class="cpick${cur&&cur.hex?' on':''}">じぶんで<input type="color" id="brHex" value="${cur&&cur.hex?cur.hex:'#3366cc'}"></label>`
+      + `<button class="lgadd${cur==='reset'?' on':''}" data-bre="reset">もとの色</button>`;
+    hint = cur ? '🖌 筆を持ってる：帯を押すとその色になる（もう一度押すか Esc で筆をおく）'
+               : '色を押して筆を持つ → 帯をポチポチ押すとその色に ／ 帯の ● を押して1本ずつ選んでもいい';
+  }
+  el.innerHTML = `<div class="ltools">${tools}</div><div class="lhint">${hint}</div>`;
 }
+function applyBrush(id){
+  if(!BRUSH || !id) return false;
+  if(BRUSH.g!=null){ if(!grpOf(BRUSH.g)) { BRUSH=null; return false; } GRP[id]=BRUSH.g; }
+  else if(BRUSH.e==='reset') delete ECOL[id];
+  else if(BRUSH.e.hex) ECOL[id]={hex:BRUSH.e.hex};
+  else { const c=EACH_SW[BRUSH.e.i]; ECOL[id]={h:c.h, dl:c.dl||0, ...(c.s!=null?{s:c.s}:{})}; }
+  colorChanged(); return true;
+}
+document.addEventListener('keydown', ev=>{ if(ev.key==='Escape' && BRUSH){ BRUSH=null; hideCPop(); drawLegend(lastColorIds); } });
 
 /* ---- 色えらびの小窓 ---- */
 const EACH_SW = [...[0,25,45,60,90,130,165,190,210,235,265,300].map(h=>({h,dl:0})), ...[0,25,45,60,90,130,165,190,210,235,265,300].map(h=>({h,dl:-14})),
@@ -991,10 +1176,16 @@ $('#cpop').addEventListener('input', ev=>{
 });
 let lastColorIds=[];
 $('#legend').addEventListener('click', ev=>{
-  if(ev.target.closest('#lgAdd')){ newGroup(); colorChanged(); toast('新しいまとまりを作った。これから1人ずつ足す人はここに入る'); return; }
-  const b=ev.target.closest('[data-lg]'); if(!b) return;
-  const r=b.getBoundingClientRect(); showGroupPop(+b.dataset.lg, r.left+r.width/2, r.bottom);
+  if(!editing()) return;
+  if(ev.target.closest('#lgAdd')){ const g=newGroup(); BRUSH={g}; colorChanged(); toast('新しいまとまりを作った。帯を押すとここに入る'); return; }
+  const ed=ev.target.closest('[data-lg]'); if(ed){ const r=ed.getBoundingClientRect(); showGroupPop(+ed.dataset.lg, r.left+r.width/2, r.bottom); return; }
+  const bg=ev.target.closest('[data-brg]'); if(bg){ const g=+bg.dataset.brg; BRUSH = BRUSH&&BRUSH.g===g ? null : {g}; hideCPop(); drawLegend(lastColorIds); return; }
+  const be=ev.target.closest('[data-bre]'); if(be){ const v=be.dataset.bre, cur=BRUSH&&BRUSH.e;
+    const same = v==='reset' ? cur==='reset' : (cur && cur.i===+v);
+    BRUSH = same ? null : {e: v==='reset' ? 'reset' : {i:+v}}; hideCPop(); drawLegend(lastColorIds); return; }
 });
+$('#legend').addEventListener('input', ev=>{ if(ev.target.id==='brHex'){ BRUSH={e:{hex:ev.target.value}}; document.body.classList.add('brushing'); } });
+$('#legend').addEventListener('change', ev=>{ if(ev.target.id==='brHex') drawLegend(lastColorIds); });
 // 共有URL・保存用
 function packColors(o, L_ids, D_ids){
   const used=[...new Set([...L_ids, ...D_ids].map(id=>GRP[id]).filter(g=>grpOf(g)))].sort((a,b)=>a-b);   // 作った順（色の配り順）
@@ -1027,7 +1218,7 @@ let events = [];            // できごと {id,n,y}
 let selected = [];
 let colorIdx = {}, nextColor = 0, manSeq = 1;
 const SET_KEY='sbg_view_v1';
-const SET = Object.assign({cmode:'group', mode:'time', dunit:'auto', dsort:'asc', font:'sys', fs:1, orient:'h', gtick:false, gband:false, vscale:1, gmode:'jp', theme:'auto', glabel:true, eralbl:true, lpos:'in'}, lsGet(SET_KEY)||{});
+const SET = Object.assign({cmode:'group', legend:false, mode:'time', dunit:'auto', dsort:'asc', font:'sys', fs:1, orient:'h', gtick:false, gband:false, vscale:1, gmode:'jp', theme:'auto', glabel:true, eralbl:true, lpos:'in'}, lsGet(SET_KEY)||{});
 
 /* ---------- 小物 ---------- */
 function $(s){ return document.querySelector(s); }
@@ -1219,9 +1410,10 @@ let READY=false;            // 起動が終わるまでURLは書きかえない�
 function syncURLSoon(){ clearTimeout(syncURLSoon._t); syncURLSoon._t=setTimeout(syncURL, 400); }
 // 見た目の設定をURL用の短い文字に：向き-色-元号-ちぇっく-背景-並べ順
 function viewCode(){ const f=(SET.gtick?1:0)+(SET.gband?2:0)+(SET.glabel?4:0)+(SET.eralbl?8:0);
-  return [SET.orient, SET.theme, SET.gmode, f, $('#era').value, $('#sort').value, SET.lpos, SET.font, String(SET.fs||1), SET.mode==='dur'?'d':'t', SET.dunit, SET.dsort, {group:'g',each:'e',name:'n'}[SET.cmode]||'g'].join('-'); }
+  return [SET.orient, SET.theme, SET.gmode, f, $('#era').value, $('#sort').value, SET.lpos, SET.font, String(SET.fs||1), SET.mode==='dur'?'d':'t', SET.dunit, SET.dsort, {group:'g',each:'e',name:'n'}[SET.cmode]||'g', SET.legend?'1':'0'].join('-'); }
 function readViewCode(v){
-  const [o,th,g,f,era,sort,lp,fo,fz,md,du,ds,cm]=(v||'').split('-'); if(!o) return;
+  const [o,th,g,f,era,sort,lp,fo,fz,md,du,ds,cm,lg]=(v||'').split('-'); if(!o) return;
+  if(lg==='1'||lg==='0') SET.legend = lg==='1';
   if(cm) SET.cmode = {g:'group',e:'each',n:'name'}[cm] || SET.cmode;
   if(md==='d') SET.mode='dur'; else if(md==='t') SET.mode='time';
   if(['auto','s','min','h','d','y','man','oku','log'].includes(du)) SET.dunit=du;
@@ -1482,7 +1674,7 @@ function render(){
       if(e>s){ ovlR=[s,e]; info=`<b>${esc(A.n)}</b> と <b>${esc(B.n)}</b> が${word}：${fmtY(s)}${ka}〜${fmtY(e)}${ka}（約${e-s}年）`; }
       else info=`<b>${esc(A.n)}</b> と <b>${esc(B.n)}</b> は重なってない（すき間 約${s-e}年）`;
     }
-  } else info = ps.length>=2 ? '帯をクリックで2つ選ぶと重なってた期間 ／ なぞるとその年に何歳か ／ '+(SET.cmode==='name'?'⋮⋮をつまむと並べ替え':SET.cmode==='each'?'●を押すと色・つまむと並べ替え':'●を押すとまとまりを変える・つまむと並べ替え')+' ／ ＋−・ctrl＋ほいーる・2本指で拡大' : '';
+  } else info = ps.length>=2 ? '帯をクリックで2つ選ぶと重なってた期間 ／ なぞるとその年に何歳か ／ '+(!editing()?'⋮⋮をつまむと並べ替え':SET.cmode==='each'?'●を押すと色・つまむと並べ替え':'●を押すとまとまりを変える・つまむと並べ替え')+' ／ ＋−・ctrl＋ほいーる・2本指で拡大' : '';
   $('#info').innerHTML = info;
 
   const eraList = ERAS[$('#era').value].map(([nm,a,b])=>[nm,Math.max(a,min),Math.min(b,max)]).filter(x=>x[2]>x[1]);
@@ -1837,10 +2029,11 @@ $('#chart').addEventListener('click', ev=>{
     hidePop.el=gs; return;
   }
   const rm = ev.target.closest('[data-rm]'); if(rm){ removeId(rm.dataset.rm); return; }
+  if(BRUSH && editing() && !ev.target.closest('[data-rm],.evlb,.gseg')){ const t=ev.target.closest('[data-cp],[data-sel],.dh[data-id],.row[data-id]'); if(t){ applyBrush(t.dataset.cp||t.dataset.sel||t.dataset.id); return; } }
   const cp = ev.target.closest('[data-cp]');
   if(cp){ if($('#cpop').dataset.for==='p:'+cp.dataset.cp){ hideCPop(); return; } const r=cp.getBoundingClientRect(); showPersonPop(cp.dataset.cp, r.left+r.width/2, r.bottom); return; }
   if(ev.target.closest('.grip')) return;
-  if(SET.mode==='dur') return;
+  if(SET.mode==='dur' || editing()) return;
   const s = ev.target.closest('[data-sel]') || ev.target.closest('.dh');
   if(s){
     const id = s.dataset.sel || s.dataset.id;
@@ -2119,7 +2312,8 @@ function applyUI(){
   for(const k of ['set','add']){ $('#sec-'+k).hidden=!UI[k]; document.querySelector(`.tog[data-sec="${k}"]`).setAttribute('aria-expanded', UI[k]?'true':'false'); }
   lsSet(UI_KEY, UI);
 }
-document.querySelectorAll('.tog').forEach(b=>b.addEventListener('click', ()=>{ UI[b.dataset.sec]=!UI[b.dataset.sec]; applyUI(); }));
+document.querySelectorAll('.tog').forEach(b=>b.addEventListener('click', ()=>{ UI[b.dataset.sec]=!UI[b.dataset.sec]; applyUI();
+  if(b.dataset.sec==='set'){ if(!UI.set) BRUSH=null; hideCPop(); render(); } }));
 $('#presetBox').addEventListener('toggle', ()=>{ UI.preset=$('#presetBox').open; lsSet(UI_KEY, UI); });
 $('#moreBtn').addEventListener('click', ev=>{ ev.stopPropagation(); $('#morePop').classList.toggle('on'); });
 $('#morePop').addEventListener('click', ev=>{ if(ev.target.closest('button')) $('#morePop').classList.remove('on'); });
@@ -2147,7 +2341,7 @@ function applySet(){
   document.documentElement.dataset.theme = SET.theme;
   document.documentElement.dataset.font = SET.font; loadFont(SET.font);
   document.documentElement.style.setProperty('--fs', String(SET.fs||1));
-  $('#font').value = SET.font; $('#fs').value = String(SET.fs||1); $('#cmode').value = SET.cmode;
+  $('#font').value = SET.font; $('#fs').value = String(SET.fs||1); $('#cmode').value = SET.cmode; $('#showLg').checked = !!SET.legend;
   if(READY) lsSet(SET_KEY, SET);   // 共有URLで開いたときの設定は、その人の保存設定に上書きしない
   syncURLSoon();
 }
@@ -2165,7 +2359,8 @@ $('#gmode').addEventListener('change', ()=>{ SET.gmode=$('#gmode').value; applyS
 $('#glabel').addEventListener('change', ()=>{ SET.glabel=$('#glabel').checked; applySet(); });
 $('#eralbl').addEventListener('change', ()=>{ SET.eralbl=$('#eralbl').checked; applySet(); render(); });
 $('#theme').addEventListener('change', ()=>{ SET.theme=$('#theme').value; applySet(); render(); });
-$('#cmode').addEventListener('change', ()=>{ SET.cmode=$('#cmode').value; hideCPop(); applySet(); render(); });
+$('#cmode').addEventListener('change', ()=>{ SET.cmode=$('#cmode').value; BRUSH=null; hideCPop(); applySet(); render(); });
+$('#showLg').addEventListener('change', ()=>{ SET.legend=$('#showLg').checked; applySet(); render(); });
 $('#sort').addEventListener('change', ()=>{ render(); syncURL(); });
 $('#era').addEventListener('change', ()=>{ render(); syncURLSoon(); });
 function syncTitle(fromH){
@@ -2276,7 +2471,7 @@ $('#loadFile').addEventListener('change', async ev=>{
     colorIdx={}; nextColor=0;
     const cc=d.colors||{}; resetGroups(); GROUPS=(cc.groups||[]).map(G=>({...G})); GRP={...(cc.grp||{})}; ECOL={...(cc.ecol||{})}; ACTIVE=cc.active||0; GSEQ=Math.max(cc.gseq||1, ...GROUPS.map(G=>G.g+1), 1);
     const s=d.settings||{};
-    Object.assign(SET, {orient:s.orient||'h', gtick:!!s.gtick, gband:!!s.gband, gmode:s.gmode||'jp', theme:s.theme||SET.theme, glabel:s.glabel!==false, eralbl:s.eralbl!==false, lpos:s.lpos||'in', font:s.font||SET.font, fs:s.fs||1, cmode:s.cmode||'group', mode:s.mode||'time', dunit:s.dunit||'auto', dsort:s.dsort||'asc'});
+    Object.assign(SET, {orient:s.orient||'h', gtick:!!s.gtick, gband:!!s.gband, gmode:s.gmode||'jp', theme:s.theme||SET.theme, glabel:s.glabel!==false, eralbl:s.eralbl!==false, lpos:s.lpos||'in', font:s.font||SET.font, fs:s.fs||1, cmode:s.cmode||'group', legend:!!s.legend, mode:s.mode||'time', dunit:s.dunit||'auto', dsort:s.dsort||'asc'});
     if(s.sort) $('#sort').value=s.sort; if(s.era) $('#era').value=s.era;
     $('#title').value=d.title||''; syncTitle(false);
     applySet(); render(); syncURL(); toast('読み込んだ！');
@@ -2323,6 +2518,13 @@ $('#dataFile').addEventListener('change', async ev=>{
   render(); syncTitle(false);
   READY=true; syncURL();
 })();
+
+/* ---------- 使い方 ---------- */
+$('#helpBtn').addEventListener('click', ()=>{ const d=$('#help'); if(d.showModal) d.showModal(); else d.setAttribute('open',''); d.querySelector('.hbody').scrollTop=0; });
+$('#helpX').addEventListener('click', ()=>$('#help').close());
+$('#help').addEventListener('click', ev=>{ if(ev.target===$('#help')) $('#help').close(); });   // 外がわを押すととじる
+$('#help .htoc').addEventListener('click', ev=>{ const a=ev.target.closest('a'); if(!a) return; ev.preventDefault();
+  const t=$('#help').querySelector(a.getAttribute('href')); if(t) t.scrollIntoView({behavior:'smooth', block:'start'}); });
 </script>
 </body>
 </html>
