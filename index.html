@@ -153,6 +153,34 @@ textarea{width:100%;min-height:80px}
 .evlb:hover{text-decoration:underline}
 .evpop{position:fixed;z-index:61;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.22);padding:8px 10px;font-size:calc(13px*var(--fs));display:none;max-width:280px}
 .evpop .t{font-weight:700;margin-bottom:2px}
+.grip.cg{width:calc(13px*var(--fs));height:calc(13px*var(--fs));padding:0;border-radius:50%;background:var(--c);flex:none;display:inline-block;box-shadow:0 0 0 1.5px var(--panel),0 0 0 2.5px color-mix(in srgb,var(--ink) 25%,transparent);cursor:pointer;margin:0 3px}
+.grip.cg:hover{background:var(--c);transform:scale(1.18)}
+.dh .grip.cg{opacity:1;letter-spacing:0}
+.V .vhead .grip.cg{margin:2px auto}
+.legend{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 6px;align-items:center}
+.legend .lg{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:2px 10px 2px 6px;font-size:calc(12.5px*var(--fs));color:var(--ink);cursor:pointer}
+.legend .lg i{width:calc(12px*var(--fs));height:calc(12px*var(--fs));border-radius:50%;display:inline-block}
+.legend .lg.act{border-color:var(--accent)}
+.legend .lg.act::after{content:'＋';color:var(--accent);font-size:.85em;margin-left:1px}
+.legend .lg.empty{opacity:.6;border-style:dashed}
+.legend .lgadd{border:1px dashed var(--line);background:none;border-radius:999px;padding:2px 10px;font-size:calc(12px*var(--fs));color:var(--sub);cursor:pointer}
+.capturing .legend .lgadd,.capturing .legend .lg.empty{display:none}
+.capturing .legend .lg.act::after{content:none}
+.cpop{position:fixed;z-index:62;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.22);padding:9px 10px;font-size:calc(13px*var(--fs));display:none;width:250px}
+.cpop .t{font-weight:700;margin-bottom:6px}
+.cpop .sub{color:var(--sub);font-size:calc(11.5px*var(--fs));margin:6px 0 3px}
+.cpop .sws{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.cpop .sw{aspect-ratio:1;border-radius:50%;border:0;padding:0;cursor:pointer;min-width:0}
+.cpop .sw.on{outline:2.5px solid var(--ink);outline-offset:1.5px}
+.cpop .row2{display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap}
+.cpop .row2 button{font-size:calc(12px*var(--fs));padding:4px 9px}
+.cpop .cpick{display:inline-flex;align-items:center;gap:4px;font-size:calc(12px*var(--fs));color:var(--sub)}
+.cpop .cpick input{width:34px;height:26px;padding:0;border:1px solid var(--line);border-radius:6px;background:none}
+.cpop input[type=text]{width:100%;box-sizing:border-box}
+.cpop .gl{display:flex;flex-direction:column;gap:4px}
+.cpop .gl button{text-align:left;font-size:calc(12.5px*var(--fs));padding:5px 9px}
+.cpop .gl button.on{border-color:var(--accent);font-weight:700}
+
 .evpop .nt{color:var(--sub);font-size:calc(11.5px*var(--fs));margin-bottom:6px}
 .evpop button{font-size:calc(12px*var(--fs));padding:4px 10px;color:var(--accent)}
 .evl{border-color:var(--ev);border-style:dashed;border-width:0;opacity:.8}
@@ -257,7 +285,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.19</span><span class="lbl" id="dataStat"></span></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.20</span><span class="lbl" id="dataStat"></span></header>
 <div class="wrap">
 
   <div class="panel">
@@ -301,6 +329,9 @@ textarea{width:100%;min-height:80px}
         </select></label>
         <label>文字の大きさ<select id="fs">
           <option value="0.85">小</option><option value="1">中</option><option value="1.25">大</option><option value="1.6">特大</option>
+        </select></label>
+        <label>帯の色分け<select id="cmode">
+          <option value="group">まとまりごと（自動で色分け）</option><option value="each">ひとりずつ（自分で色をえらぶ）</option><option value="name">なし（ばらばらの色）</option>
         </select></label>
         <label>名前の場所<select id="lpos">
           <option value="in">帯の中</option><option value="after">帯の外・うしろ</option><option value="before">帯の外・まえ</option>
@@ -366,6 +397,7 @@ textarea{width:100%;min-height:80px}
 
   <div id="cap">
   <h2 class="ttl" id="titleH" contenteditable="plaintext-only" spellcheck="false" hidden></h2>
+  <div class="legend" id="legend" hidden></div>
   <div id="info"></div>
   <div class="zbar" id="zbar">
     <button id="namesBtn" title="名前の列をひらく・たたむ">名前の列</button>
@@ -379,6 +411,7 @@ textarea{width:100%;min-height:80px}
 <div class="toast" id="toast"></div>
 <div class="gpop" id="gpop"></div>
 <div class="evpop" id="evpop"></div>
+<div class="cpop" id="cpop"></div>
 
 <script>
 'use strict';
@@ -723,8 +756,9 @@ function durFromPreset(si, ii){
     txt: it.t + (it.mx?`（最長 ${it.mx}）`:''), note:it.note||'', src:it.src||'', pk:[si,ii]};
 }
 function addDurSet(si){
-  const have=new Set(DUR.map(d=>d.n)); let n=0;
-  DUR_PRESETS[si].items.forEach((it,ii)=>{ if(have.has(it.n)) return; const d=durFromPreset(si,ii); if(d){ DUR.push(d); n++; } });
+  const have=new Set(DUR.map(d=>d.n)); let n=0; const pa=ACTIVE, gN=newGroup(DUR_PRESETS[si].name);
+  DUR_PRESETS[si].items.forEach((it,ii)=>{ if(have.has(it.n)) return; const d=durFromPreset(si,ii); if(d){ DUR.push(d); GRP[d.id]=gN; n++; } });
+  dropIfEmpty(gN, pa);
   SET.mode='dur'; applySet();
   toast(n ? `「${DUR_PRESETS[si].name}」を${n}こ足した（長さくらべ）` : 'もう全部入ってる');
   render(); syncURL();
@@ -758,9 +792,10 @@ function renderDur(chart){
   chart.className='chart H'; document.body.classList.toggle('zoomed', ZOOM>1.01);
   if(!rows.length){
     geo=null; chart.innerHTML=`<div class="empty">長さくらべ：「＋ 足す」→「プリセット（長さくらべ）」を押すか、<br>人を並べると享年で比べられる。検索で「セシウム137」みたいに打つと半減期も足せる</div>`;
-    $('#info').innerHTML=''; $('#zbar').hidden=true; return;
+    $('#info').innerHTML=''; $('#zbar').hidden=true; drawLegend([]); return;
   }
   $('#zbar').hidden=false;
+  lastColorIds=rows.map(r=>r.id); prepColors(lastColorIds); drawLegend(lastColorIds);
   const isLog = SET.dunit==='log';
   const maxSec = Math.max(...rows.map(r=>r.mx||r.hi));
   const minSec = Math.min(...rows.map(r=>r.lo).filter(x=>x>0));
@@ -784,16 +819,16 @@ function renderDur(chart){
   else { const step=durStep(max-min, Math.max(6, Math.round(LEN/110))); for(let i=0; i*step<=max && i<5000; i++){ const t=+(i*step).toPrecision(12); ticks.push([t, (t===0?'0':(['man','oku'].includes(unitK)?nf(t):jaBig(t)))+DUNITS[unitK][1]]); } }
   const tickLbl = ticks.map(([v,l])=>`<div class="tick" style="left:${P(v)}${v<=min+(max-min)*0.01?';transform:none':''}">${esc(l)}</div>`).join('');
   const grid = ticks.map(([v])=>`<div class="gridl" style="left:${P(v)}"></div>`).join('');
-  const handle = r => `<span class="grip" style="visibility:hidden">⋮⋮</span><button class="x" title="消す" data-rm="${r.id}">×</button>`;
+  const handle = r => `${gripHTML(r.id,true)}<button class="x" title="消す" data-rm="${r.id}">×</button>`;
   const left = isLog ? min : 0;
   const rowsH = rows.map(r=>{
-    const h=colorH(r.id), c=`hsl(${h} var(--bs) var(--bl))`;
+    const c=col(r.id);
     const a0=ax(r.lo), a1=ax(r.hi), am=r.mx?ax(r.mx):null;
     const right = Math.max(a1, am??a1);
     const w = Math.max(right-left, 1e-9), pc = v => ((v-left)/w*100).toFixed(2)+'%';
     const st=[`${c} 0%`];
-    if(a1>a0){ st.push(`${c} ${pc(a0)}`, `hsl(${h} var(--bs) var(--bl) / .55) ${pc(a1)}`); } else st.push(`${c} ${pc(a1)}`);
-    if(am!=null && am>a1){ st.push(`hsl(${h} var(--bs) var(--bl) / .28) ${pc(a1)}`, `hsl(${h} var(--bs) var(--bl) / .2) ${pc(am-(am-a1)*0.15)}`, `hsl(${h} var(--bs) var(--bl) / 0) 100%`); }
+    if(a1>a0){ st.push(`${c} ${pc(a0)}`, `${col(r.id,.55)} ${pc(a1)}`); } else st.push(`${c} ${pc(a1)}`);
+    if(am!=null && am>a1){ st.push(`${col(r.id,.28)} ${pc(a1)}`, `${col(r.id,.2)} ${pc(am-(am-a1)*0.15)}`, `${col(r.id,0.001)} 100%`); }
     const tip = [r.n+' '+r.txt, r.note, r.src?('出典：'+r.src):''].filter(Boolean).join('\n');
     return `<div class="row" data-id="${r.id}">
       <div class="name dh" data-id="${r.id}">${handle(r)}<span class="nm" title="${esc(r.n)}">${esc(r.n)}</span>${r.person?'<span class="tag">享年</span>':''}</div>
@@ -811,6 +846,179 @@ function renderDur(chart){
   return {min, max, LEN, NW, isLog, U, bars: rows.map(r=>({p:{id:r.id}, g:{left, right:Math.max(ax(r.hi), r.mx?ax(r.mx):ax(r.hi))}}))};
 }
 
+/* ---------- 色分け（まとまりごと／ひとりずつ／なし） ----------
+   GROUPS：まとまり {g, n, col}  col = null（自動）| {h}（系統だけ指定）| {hex}（色を指定）
+   GRP：id → g（どのまとまりか）  ECOL：id → {h,dl,s?} | {hex}（ひとりずつで決めた色）
+   ACTIVE：1人ずつ足したときに入るまとまり */
+let GROUPS=[], GRP={}, ECOL={}, ACTIVE=0, GSEQ=1, COLMAP={};
+const GHUES=[4,214,134,40,276,186,328,88,250,18,160,300];   // まとまりの系統（見分けやすい順）
+const GHUE_NAMES={4:'赤',214:'青',134:'緑',40:'黄土',276:'紫',186:'水色',328:'桃',88:'うぐいす',250:'藍',18:'橙',160:'青緑',300:'赤紫'};
+const DL_SEQ=[0,-9,8,-4,4,-13,12,-7,7,-11,10];                 // まとまりの中で明るさをずらす
+const vdc=n=>{ let v=0,d=1; while(n){ d*=2; v+=(n&1)/d; n>>=1; } return v; };   // 0.5,0.25,0.75,…（となりどうしが離れる）
+function hex2hsl(hex){
+  const m=/^#?([0-9a-f]{6})$/i.exec(hex||''); if(!m) return {h:0,s:0,l:50};
+  const n=parseInt(m[1],16), r=(n>>16&255)/255, g=(n>>8&255)/255, b=(n&255)/255;
+  const mx=Math.max(r,g,b), mn=Math.min(r,g,b), l=(mx+mn)/2; let h=0, s=0;
+  if(mx!==mn){ const d=mx-mn; s=l>.5? d/(2-mx-mn) : d/(mx+mn);
+    h = mx===r ? (g-b)/d+(g<b?6:0) : mx===g ? (b-r)/d+2 : (r-g)/d+4; h*=60; }
+  return {h:Math.round(h), s:Math.round(s*100), l:Math.round(l*100)};
+}
+function grpOf(g){ return GROUPS.find(x=>x.g===g); }
+function newGroup(name){ const g=GSEQ++; GROUPS.push({g, n:name||('グループ'+g), col:null}); ACTIVE=g; return g; }
+function ensureActive(){ if(!grpOf(ACTIVE)) newGroup(); return ACTIVE; }
+// 足したまとまりが空っぽだったら、なかったことに
+function dropIfEmpty(g, prevActive){ if(Object.values(GRP).includes(g)) return; GROUPS=GROUPS.filter(x=>x.g!==g); if(ACTIVE===g) ACTIVE=prevActive; }
+function resetGroups(){ GROUPS=[]; GRP={}; ACTIVE=0; GSEQ=1; }
+// 今みえてる並び（ids）から色を決める
+function prepColors(ids){
+  COLMAP={};
+  const all=[...list, ...DUR.map(d=>d.id)];
+  for(const id of all) if(!grpOf(GRP[id])) GRP[id]=ensureActive();
+  if(SET.cmode==='name') return;
+  const members=new Map();
+  for(const id of ids){ const g=GRP[id]; if(!members.has(g)) members.set(g,[]); members.get(g).push(id); }
+  const gs=GROUPS.filter(x=>members.has(x.g));            // 作った順
+  const k=gs.length;
+  // 系統を指定してないまとまりに、まだ使われてない色相を配る
+  const used=new Set(gs.filter(x=>x.col&&x.col.h!=null).map(x=>x.col.h)); let hi=0;
+  const autoHue=()=>{ while(hi<GHUES.length && used.has(GHUES[hi])) hi++; if(hi<GHUES.length) return GHUES[hi++]; return (hi++*137.508)%360; };
+  const S = Math.min(360/Math.max(k,1)*0.42, 56);         // まとまりの中の色相のはば
+  gs.forEach(G=>{
+    const ms=members.get(G.g), n=ms.length;
+    const base = G.col&&G.col.hex ? hex2hsl(G.col.hex) : {h: G.col&&G.col.h!=null ? G.col.h : autoHue()};
+    ms.forEach((id,j)=>{
+      let h, dl=DL_SEQ[j%DL_SEQ.length];
+      if(k===1 && !G.col) h=(base.h + j*137.508)%360, dl=0;    // まとまりが1つだけなら、今までどおり虹色に
+      else h=(base.h + (n>1 ? (vdc(j+1)-0.5)*(base.s!=null?Math.min(S,36):S) : 0) + 360)%360;
+      COLMAP[id] = base.s!=null ? {h, s:base.s, l:Math.max(18,Math.min(82,base.l+dl))} : {h, dl};
+    });
+  });
+  if(SET.cmode==='each') for(const id of ids){ const e=ECOL[id]; if(!e) continue;
+    COLMAP[id] = e.hex ? hex2hsl(e.hex) : {h:e.h, dl:e.dl||0, ...(e.s!=null?{s:e.s, rel:1}:{})}; }
+}
+// 帯の色（a＝透明度）
+function col(id, a=1){
+  const c = COLMAP[id] || {h:+colorH(id), dl:0};
+  const al = a<1 ? ` / ${(+a).toFixed(2)}` : '';
+  if(c.l!=null) return `hsl(${(+c.h).toFixed(1)} ${c.s}% ${c.l}%${al})`;
+  const S = c.rel ? `${c.s}%` : 'var(--bs)';
+  const L = c.dl ? `calc(var(--bl) ${c.dl<0?'-':'+'} ${Math.abs(c.dl)}%)` : 'var(--bl)';
+  return `hsl(${(+c.h).toFixed(1)} ${S} ${L}${al})`;
+}
+// 名前の横の「●」（つまむと並べ替え、押すと色）
+function gripHTML(id, hidden){
+  if(SET.cmode==='name') return `<span class="grip"${hidden?' style="visibility:hidden"':''}>⋮⋮</span>`;
+  return `<span class="grip cg${hidden?' nodrag':''}" data-cp="${id}" style="--c:${col(id)}" title="${SET.cmode==='each'?'押すと色をえらべる':'押すとまとまりを変えられる'}${hidden?'':'・つまむと並べ替え'}"></span>`;
+}
+
+/* ---- 凡例（まとまりごとのとき） ---- */
+function drawLegend(ids){
+  const el=$('#legend');
+  if(SET.cmode!=='group' || !ids.length){ el.hidden=true; el.innerHTML=''; return; }
+  const cnt={}; ids.forEach(id=>{ cnt[GRP[id]]=(cnt[GRP[id]]||0)+1; });
+  const gs=GROUPS.filter(G=>cnt[G.g] || G.g===ACTIVE);
+  el.hidden=false;
+  el.innerHTML = gs.map(G=>{ const first=ids.find(id=>GRP[id]===G.g);
+    const c = first ? col(first) : 'var(--line)';
+    return `<button class="lg${G.g===ACTIVE?' act':''}${cnt[G.g]?'':' empty'}" data-lg="${G.g}" title="押すと名前・色を変えられる${G.g===ACTIVE?'（1人ずつ足すと、ここに入る）':''}"><i style="background:${c}"></i>${esc(G.n)}${cnt[G.g]?'':'（まだ空）'}</button>`; }).join('')
+    + `<button class="lgadd" id="lgAdd" title="新しいまとまりを作って、これから1人ずつ足す人をそこに入れる">＋ まとまり</button>`;
+}
+
+/* ---- 色えらびの小窓 ---- */
+const EACH_SW = [...[0,25,45,60,90,130,165,190,210,235,265,300].map(h=>({h,dl:0})), ...[0,25,45,60,90,130,165,190,210,235,265,300].map(h=>({h,dl:-14})),
+                 {h:0,s:0,dl:-10},{h:30,s:20,dl:0}];
+function swHTML(list, key, cur){
+  return `<div class="sws">${list.map((c,i)=>{ const st = c.s!=null ? `hsl(${c.h} ${c.s}% calc(var(--bl) ${c.dl<0?'-':'+'} ${Math.abs(c.dl)}%))` : `hsl(${c.h} var(--bs) calc(var(--bl) ${c.dl<0?'-':'+'} ${Math.abs(c.dl||0)}%))`;
+    return `<button class="sw${cur===i?' on':''}" data-${key}="${i}" style="background:${st}" title="${c.nm||''}"></button>`; }).join('')}</div>`;
+}
+function placePop(pop, x, y){
+  pop.style.display='block';
+  const pw=pop.offsetWidth, ph=pop.offsetHeight;
+  pop.style.left=Math.max(4, Math.min(window.innerWidth-pw-4, x-pw/2))+'px';
+  pop.style.top=(y+ph+16 < window.innerHeight ? y+12 : Math.max(4, y-ph-12))+'px';
+}
+function hideCPop(){ $('#cpop').style.display='none'; $('#cpop').dataset.for=''; }
+function itemName(id){ const p=PEOPLE[id]; if(p) return p.n; const d=DUR.find(x=>x.id===id); return d?d.n:''; }
+function showPersonPop(id, x, y){
+  const pop=$('#cpop'); pop.dataset.for='p:'+id;
+  if(SET.cmode==='each'){
+    const e=ECOL[id]; const cur = e && !e.hex ? EACH_SW.findIndex(c=>c.h===e.h && (c.dl||0)===(e.dl||0) && c.s===e.s) : -1;
+    pop.innerHTML = `<div class="t">${esc(itemName(id))} の色</div>${swHTML(EACH_SW,'ec',cur)}
+      <div class="row2"><label class="cpick">じぶんで<input type="color" id="ecHex" value="${e&&e.hex?e.hex:'#3366cc'}"></label><button data-ecreset="1">もとの色にもどす</button></div>`;
+  } else {
+    const cnt={}; Object.entries(GRP).forEach(([k,g])=>{ if(list.includes(k)||DUR.some(d=>d.id===k)) cnt[g]=(cnt[g]||0)+1; });
+    const gs=GROUPS.filter(G=>cnt[G.g]||G.g===ACTIVE);
+    pop.innerHTML = `<div class="t">${esc(itemName(id))} のまとまり</div>
+      <div class="gl">${gs.map(G=>`<button class="${GRP[id]===G.g?'on':''}" data-mv="${G.g}">${GRP[id]===G.g?'✓ ':''}${esc(G.n)}</button>`).join('')}
+      <button data-mv="new">＋ 新しいまとまり</button></div>`;
+  }
+  placePop(pop, x, y);
+}
+function showGroupPop(g, x, y){
+  const G=grpOf(g); if(!G) return; const pop=$('#cpop'); pop.dataset.for='g:'+g;
+  const sw=GHUES.map(h=>({h, dl:0, nm:GHUE_NAMES[h]+'系'}));
+  const cur = G.col && G.col.h!=null ? GHUES.indexOf(G.col.h) : -1;
+  pop.innerHTML = `<div class="t">まとまり</div>
+    <input type="text" id="gName" value="${esc(G.n)}" maxlength="30">
+    <div class="sub">系統の色</div>${swHTML(sw,'gh',cur)}
+    <div class="row2"><label class="cpick">じぶんで<input type="color" id="gHex" value="${G.col&&G.col.hex?G.col.hex:'#cc4433'}"></label><button data-gauto="1"${G.col?'':' disabled'}>自動の色</button></div>
+    <div class="row2"><button data-gact="1"${g===ACTIVE?' disabled':''}>${g===ACTIVE?'✓ 1人ずつ足すとここに入る':'1人ずつ足すのをここにする'}</button></div>`;
+  placePop(pop, x, y);
+}
+function colorChanged(){ render(); syncURLSoon(); }
+document.addEventListener('click', ev=>{ const inside=ev.composedPath().some(n=>n.nodeType===1 && n.matches && n.matches('#cpop,[data-cp],[data-lg]')); if(!inside && ev.target.isConnected) hideCPop(); });
+window.addEventListener('scroll', hideCPop, {passive:true});
+function cpopTarget(){ const f=$('#cpop').dataset.for||''; return [f.slice(0,1), f.slice(2)]; }
+$('#cpop').addEventListener('click', ev=>{
+  const [k, t]=cpopTarget(); const b=ev.target.closest('button'); if(!b) return;
+  if(k==='p'){
+    if(b.dataset.ec!=null){ const c=EACH_SW[+b.dataset.ec]; ECOL[t]={h:c.h, dl:c.dl||0, ...(c.s!=null?{s:c.s}:{})}; hideCPop(); colorChanged(); }
+    if(b.dataset.ecreset){ delete ECOL[t]; hideCPop(); colorChanged(); }
+    if(b.dataset.mv){ GRP[t] = b.dataset.mv==='new' ? newGroup() : +b.dataset.mv; hideCPop(); colorChanged(); }
+  }
+  if(k==='g'){ const G=grpOf(+t); if(!G) return;
+    if(b.dataset.gh!=null){ G.col={h:GHUES[+b.dataset.gh]}; colorChanged(); showGroupPop(G.g, ...popXY()); }
+    if(b.dataset.gauto){ G.col=null; colorChanged(); showGroupPop(G.g, ...popXY()); }
+    if(b.dataset.gact){ ACTIVE=G.g; colorChanged(); showGroupPop(G.g, ...popXY()); }
+  }
+});
+function popXY(){ const p=$('#cpop'), r=p.getBoundingClientRect(); return [r.left+r.width/2, r.top-12]; }
+$('#cpop').addEventListener('input', ev=>{
+  const [k, t]=cpopTarget();
+  if(ev.target.id==='ecHex'){ ECOL[t]={hex:ev.target.value}; colorChanged(); }
+  if(ev.target.id==='gHex'){ const G=grpOf(+t); if(G){ G.col={hex:ev.target.value}; colorChanged(); } }
+  if(ev.target.id==='gName'){ const G=grpOf(+t); if(G){ G.n=ev.target.value.trim()||G.n; drawLegend(lastColorIds); syncURLSoon(); } }
+});
+let lastColorIds=[];
+$('#legend').addEventListener('click', ev=>{
+  if(ev.target.closest('#lgAdd')){ newGroup(); colorChanged(); toast('新しいまとまりを作った。これから1人ずつ足す人はここに入る'); return; }
+  const b=ev.target.closest('[data-lg]'); if(!b) return;
+  const r=b.getBoundingClientRect(); showGroupPop(+b.dataset.lg, r.left+r.width/2, r.bottom);
+});
+// 共有URL・保存用
+function packColors(o, L_ids, D_ids){
+  const used=[...new Set([...L_ids, ...D_ids].map(id=>GRP[id]).filter(g=>grpOf(g)))].sort((a,b)=>a-b);   // 作った順（色の配り順）
+  if(ACTIVE && grpOf(ACTIVE) && !used.includes(ACTIVE)) used.push(ACTIVE);
+  if(!used.length) return;
+  const gi=g=>used.indexOf(g);
+  o.G = used.map(g=>{ const G=grpOf(g); return [G.n, G.col ? (G.col.hex||G.col.h) : 0]; });
+  o.ga = gi(ACTIVE);
+  if(L_ids.length) o.gL = L_ids.map(id=>gi(GRP[id]));
+  if(D_ids.length) o.gD = D_ids.map(id=>gi(GRP[id]));
+  const ec={}; [...L_ids.map((id,i)=>['L'+i,id]), ...D_ids.map((id,i)=>['D'+i,id])].forEach(([k,id])=>{ const e=ECOL[id]; if(e) ec[k]= e.hex ? e.hex : [e.h, e.dl||0, e.s??null]; });
+  if(Object.keys(ec).length) o.ec=ec;
+}
+function unpackColors(o, L_ids, D_ids){
+  resetGroups(); ECOL={};
+  if(!o.G) return;
+  const gs=o.G.map(([n,c])=>{ const g=GSEQ++; GROUPS.push({g, n:String(n), col: c ? (typeof c==='string' ? {hex:c} : {h:+c}) : null}); return g; });
+  ACTIVE = gs[o.ga] ?? gs[gs.length-1] ?? 0;
+  (o.gL||[]).forEach((k,i)=>{ if(L_ids[i] && gs[k]) GRP[L_ids[i]]=gs[k]; });
+  (o.gD||[]).forEach((k,i)=>{ if(D_ids[i] && gs[k]) GRP[D_ids[i]]=gs[k]; });
+  for(const [k,v] of Object.entries(o.ec||{})){ const id = k[0]==='L' ? L_ids[+k.slice(1)] : D_ids[+k.slice(1)]; if(!id) continue;
+    ECOL[id] = typeof v==='string' ? {hex:v} : {h:v[0], dl:v[1]||0, ...(v[2]!=null?{s:v[2]}:{})}; }
+}
+
 /* ---------- 状態 ---------- */
 let DATA = null;
 const PEOPLE = {};          // id -> 人（と、自分で足した期間 type:'period'）
@@ -819,7 +1027,7 @@ let events = [];            // できごと {id,n,y}
 let selected = [];
 let colorIdx = {}, nextColor = 0, manSeq = 1;
 const SET_KEY='sbg_view_v1';
-const SET = Object.assign({mode:'time', dunit:'auto', dsort:'asc', font:'sys', fs:1, orient:'h', gtick:false, gband:false, vscale:1, gmode:'jp', theme:'auto', glabel:true, eralbl:true, lpos:'in'}, lsGet(SET_KEY)||{});
+const SET = Object.assign({cmode:'group', mode:'time', dunit:'auto', dsort:'asc', font:'sys', fs:1, orient:'h', gtick:false, gband:false, vscale:1, gmode:'jp', theme:'auto', glabel:true, eralbl:true, lpos:'in'}, lsGet(SET_KEY)||{});
 
 /* ---------- 小物 ---------- */
 function $(s){ return document.querySelector(s); }
@@ -1011,9 +1219,10 @@ let READY=false;            // 起動が終わるまでURLは書きかえない�
 function syncURLSoon(){ clearTimeout(syncURLSoon._t); syncURLSoon._t=setTimeout(syncURL, 400); }
 // 見た目の設定をURL用の短い文字に：向き-色-元号-ちぇっく-背景-並べ順
 function viewCode(){ const f=(SET.gtick?1:0)+(SET.gband?2:0)+(SET.glabel?4:0)+(SET.eralbl?8:0);
-  return [SET.orient, SET.theme, SET.gmode, f, $('#era').value, $('#sort').value, SET.lpos, SET.font, String(SET.fs||1), SET.mode==='dur'?'d':'t', SET.dunit, SET.dsort].join('-'); }
+  return [SET.orient, SET.theme, SET.gmode, f, $('#era').value, $('#sort').value, SET.lpos, SET.font, String(SET.fs||1), SET.mode==='dur'?'d':'t', SET.dunit, SET.dsort, {group:'g',each:'e',name:'n'}[SET.cmode]||'g'].join('-'); }
 function readViewCode(v){
-  const [o,th,g,f,era,sort,lp,fo,fz,md,du,ds]=(v||'').split('-'); if(!o) return;
+  const [o,th,g,f,era,sort,lp,fo,fz,md,du,ds,cm]=(v||'').split('-'); if(!o) return;
+  if(cm) SET.cmode = {g:'group',e:'each',n:'name'}[cm] || SET.cmode;
   if(md==='d') SET.mode='dur'; else if(md==='t') SET.mode='time';
   if(['auto','s','min','h','d','y','man','oku','log'].includes(du)) SET.dunit=du;
   if(ds==='asc'||ds==='desc') SET.dsort=ds;
@@ -1047,6 +1256,7 @@ function packState(){
   const o={L, v:viewCode()};
   if(DUR.length) o.D=DUR.map(d=>d.pk ? d.pk : ['h', d.n, d.lo, d.hi, d.mx, d.src||'', d.q||'']);
   if(E.length) o.E=E;
+  packColors(o, list.slice(), DUR.map(d=>d.id));
   const t=$('#title').value.trim(); if(t) o.t=t;
   const sel=selected.map(id=>list.indexOf(id)).filter(i=>i>=0); if(sel.length) o.s=sel;
   if(ZOOM>1.01){ const vi=viewInfo(); if(vi){ o.z=+ZOOM.toFixed(2); o.c=Math.round(vi.center); } }
@@ -1055,18 +1265,23 @@ function packState(){
 async function unpackState(o){
   if(o.v) readViewCode(o.v);
   if(o.t) $('#title').value=o.t;
-  const ids=[];
+  const ids=[], Lids=[], Dids=[];
   for(const x of o.L||[]){
-    if(typeof x==='number'){ ids.push('Q'+x); continue; }
-    const id='M'+(manSeq++);
-    if(Array.isArray(x) && x[0]==='p'){ PEOPLE[id]={id, n:x[1], type:'period', b:x[2], d:x[3]}; ids.push(id); continue; }
-    if(Array.isArray(x) && typeof x[0]==='number'){ const it=(PERIOD_PRESETS[x[0]]||{}).items?.[x[1]]; const q=it&&presetPeriod(it); if(q){ PEOPLE[id]={id,...q,pre:1,pk:x}; ids.push(id); } }
+    const n0=ids.length;
+    if(typeof x==='number'){ ids.push('Q'+x); }
+    else { const id='M'+(manSeq++);
+      if(Array.isArray(x) && x[0]==='p'){ PEOPLE[id]={id, n:x[1], type:'period', b:x[2], d:x[3]}; ids.push(id); }
+      else if(Array.isArray(x) && typeof x[0]==='number'){ const it=(PERIOD_PRESETS[x[0]]||{}).items?.[x[1]]; const q=it&&presetPeriod(it); if(q){ PEOPLE[id]={id,...q,pre:1,pk:x}; ids.push(id); } } }
+    Lids.push(ids.length>n0 ? ids[ids.length-1] : null);
   }
   DUR=[];
   for(const x of o.D||[]){
+    const n0=DUR.length;
     if(Array.isArray(x) && typeof x[0]==='number'){ const d=DUR_PRESETS[x[0]]&&DUR_PRESETS[x[0]].items[x[1]] ? durFromPreset(x[0],x[1]) : null; if(d) DUR.push(d); }
     else if(Array.isArray(x) && x[0]==='h') DUR.push({id:'D'+(manSeq++), n:x[1], lo:x[2], hi:x[3], mx:x[4], txt:fmtDur(x[2])+(x[3]>x[2]?'〜'+fmtDur(x[3]):''), src:x[5]||'', q:x[6]||'', note:''});
+    Dids.push(DUR.length>n0 ? DUR[DUR.length-1].id : null);
   }
+  unpackColors(o, Lids, Dids);
   for(const x of o.E||[]){
     const id='E'+(manSeq++);
     if(Array.isArray(x) && x[0]==='e') events.push({id, n:x[1], y:x[2]});
@@ -1114,12 +1329,12 @@ function findPresetItem(n, key){ for(const ps of PERIOD_PRESETS) for(const it of
 function presetEvent(it, id){ const Y=pyear(it.y); return {id, n:it.n, y:Y[0], note:it.note||'', pre:1}; }
 // プリセットを今の画面に足す（同じ名前のものはとばす）
 function addPresetSet(i){
-  const ps=PERIOD_PRESETS[i]; let nA=0;
+  const ps=PERIOD_PRESETS[i]; let nA=0; const pa=ACTIVE, gN=newGroup(ps.name);
   const have=new Set([...list.map(id=>PEOPLE[id]&&PEOPLE[id].n), ...events.map(e=>e.n)]);
   for(const it of ps.items||[]){ if(have.has(it.n)) continue; const q=presetPeriod(it); if(!q) continue;
-    const id='M'+(manSeq++); PEOPLE[id]={id,...q,pre:1, pk:[i,(ps.items||[]).indexOf(it)]}; list.push(id); nA++; }
+    const id='M'+(manSeq++); PEOPLE[id]={id,...q,pre:1, pk:[i,(ps.items||[]).indexOf(it)]}; list.push(id); GRP[id]=gN; nA++; }
   for(const it of ps.events||[]){ if(have.has(it.n)) continue; events.push({...presetEvent(it,'E'+(manSeq++)), pk:[i,ps.events.indexOf(it)]}); nA++; }
-  events.sort((x,y)=>x.y-y.y);
+  events.sort((x,y)=>x.y-y.y); dropIfEmpty(gN, pa);
   toast(nA ? `「${ps.name}」を${nA}こ足した` : 'もう全部入ってる');
   render(); syncURL();
 }
@@ -1161,13 +1376,13 @@ function niceStep(span, maxTicks){
 // 1人ぶんの帯のかたち
 function barOf(p){
   const e = endOf(p), [ba,bz] = bZone(p);
-  const h = colorH(p.id), c = `hsl(${h} var(--bs) var(--bl))`;
+  const c = col(p.id);
   const left = ba, right = Math.max(e.z, bz+0.5), w = right-left;
   const pc = v => ((v-left)/w*100).toFixed(2)+'%';
   // ぼかしは透明（0）から、なめらかなカーブで色に（地の色に溶けるように）
   const EASE = [[0,0],[.15,.04],[.3,.13],[.45,.28],[.6,.47],[.75,.68],[.88,.86],[1,1]];
   const ramp = (from, to, rev) => EASE.map(([t,a])=>{ const x=from+(to-from)*t; const al = rev ? 1-a : a;
-    return `hsl(${h} var(--bs) var(--bl) / ${al.toFixed(2)}) ${((x-left)/w*100).toFixed(2)}%`; });
+    return `${col(p.id, Math.max(al,0.001))} ${((x-left)/w*100).toFixed(2)}%`; });
   const st = [];
   if(bz>ba) st.push(...ramp(ba, bz, false)); else st.push(`${c} 0%`);
   if(e.z>e.a) st.push(...ramp(e.a, e.z, true)); else st.push(`${c} 100%`);
@@ -1227,8 +1442,9 @@ function render(){
   if(!ps.length && !events.length){
     geo=null;
     chart.innerHTML = `<div class="empty">名前を入れるか、上のプリセットを押すと<br>生まれてから亡くなるまでの帯がズラッと並ぶ</div>`;
-    $('#info').innerHTML=''; $('#zbar').hidden=true; return;
+    $('#info').innerHTML=''; $('#zbar').hidden=true; drawLegend([]); return;
   }
+  lastColorIds=ps.map(p=>p.id); prepColors(lastColorIds); drawLegend(lastColorIds);
   const bars = ps.map(p=>({p, g:barOf(p)}));
   let min = Math.min(...bars.map(b=>b.g.left), ...events.map(e=>e.y));
   let max = Math.max(...bars.map(b=>b.g.right), ...events.map(e=>e.y));
@@ -1266,7 +1482,7 @@ function render(){
       if(e>s){ ovlR=[s,e]; info=`<b>${esc(A.n)}</b> と <b>${esc(B.n)}</b> が${word}：${fmtY(s)}${ka}〜${fmtY(e)}${ka}（約${e-s}年）`; }
       else info=`<b>${esc(A.n)}</b> と <b>${esc(B.n)}</b> は重なってない（すき間 約${s-e}年）`;
     }
-  } else info = ps.length>=2 ? '帯をクリックで2つ選ぶと重なってた期間 ／ なぞるとその年に何歳か ／ ⋮⋮をつまむと並べ替え ／ ＋−・ctrl＋ほいーる・2本指で拡大' : '';
+  } else info = ps.length>=2 ? '帯をクリックで2つ選ぶと重なってた期間 ／ なぞるとその年に何歳か ／ '+(SET.cmode==='name'?'⋮⋮をつまむと並べ替え':SET.cmode==='each'?'●を押すと色・つまむと並べ替え':'●を押すとまとまりを変える・つまむと並べ替え')+' ／ ＋−・ctrl＋ほいーる・2本指で拡大' : '';
   $('#info').innerHTML = info;
 
   const eraList = ERAS[$('#era').value].map(([nm,a,b])=>[nm,Math.max(a,min),Math.min(b,max)]).filter(x=>x[2]>x[1]);
@@ -1299,7 +1515,7 @@ function render(){
   const tickLbl = ticks.map(t=>{ const gt=tickG(t); return `<div class="tick" style="${pos(t)}">${fmtY(t)}${gt.map(x=>`<small>${esc(x)}</small>`).join('')}</div>`; }).join('');
   const evLbl = evShow.map(ev=>`<div class="evlb" data-eid="${ev.id}" style="${pos(ev.y)}" title="押すと「消す」が出る">${esc(fmtY(ev.y))} ${esc(ev.n)}</div>`).join('');
 
-  const handle = p => `<span class="grip">⋮⋮</span><button class="x" title="消す" data-rm="${p.id}">×</button>`;
+  const handle = p => `${gripHTML(p.id)}<button class="x" title="消す" data-rm="${p.id}">×</button>`;
   const barHTML = (p,g) => `<div class="${g.cls}" data-sel="${p.id}" style="${box(g.left,g.right)};background:linear-gradient(${V?'180deg':'90deg'}, ${g.st.join(', ')})" title="${esc(p.n)} ${esc(g.txt)}${g.note?'&#10;'+esc(g.note):''}"><span class="lb" style="${V?'top':'left'}:${g.lbAt}"><b>${esc(p.n)}</b>${esc(g.txt)}</span></div>
       <span class="lbo"><b>${esc(p.n)}</b><span>${esc(g.txt)}</span></span>
       <span class="age" data-b="${g.ageB}" data-s="${g.left}" data-e="${g.right}" data-f="${g.ageF}" data-ua="${g.ua}"></span>`;
@@ -1375,7 +1591,7 @@ function onScroll(){
 // 全体図：一人ずつ細い線で
 function drawMini(bars, min, max){
   const n=bars.length||1, H=24;
-  $('#mlines').innerHTML = bars.map(({p,g},i)=>`<i style="left:${((g.left-min)/(max-min)*100).toFixed(2)}%;width:${(Math.max(.4,(g.right-g.left)/(max-min)*100)).toFixed(2)}%;top:${(n<=1?H/2:i*(H-2)/(n-1)).toFixed(1)}px;background:hsl(${colorH(p.id)} var(--bs) var(--bl))"></i>`).join('');
+  $('#mlines').innerHTML = bars.map(({p,g},i)=>`<i style="left:${((g.left-min)/(max-min)*100).toFixed(2)}%;width:${(Math.max(.4,(g.right-g.left)/(max-min)*100)).toFixed(2)}%;top:${(n<=1?H/2:i*(H-2)/(n-1)).toFixed(1)}px;background:${col(p.id)}"></i>`).join('');
 }
 /* ---------- ズーム ---------- */
 function zoomTo(z, y, f){
@@ -1552,7 +1768,7 @@ function endPan(){ if(!pan) return; if(pan.on){ justDragged=true; setTimeout(()=
 document.addEventListener('pointerup', endPan);
 document.addEventListener('pointercancel', endPan);
 $('#chart').addEventListener('pointerdown', ev=>{
-  const g=ev.target.closest('.grip'); if(!g) return;   // 並べ替えは「⋮⋮」をつまんだときだけ
+  const g=ev.target.closest('.grip'); if(!g || g.classList.contains('nodrag') || SET.mode==='dur') return;   // 並べ替えは「⋮⋮」をつまんだときだけ
   const h=g.closest('.dh'); if(!h) return; ev.preventDefault();
   drag={id:h.dataset.id, x0:ev.clientX, y0:ev.clientY, on:false, target:null, after:false, pid:ev.pointerId, h};
 });
@@ -1621,6 +1837,8 @@ $('#chart').addEventListener('click', ev=>{
     hidePop.el=gs; return;
   }
   const rm = ev.target.closest('[data-rm]'); if(rm){ removeId(rm.dataset.rm); return; }
+  const cp = ev.target.closest('[data-cp]');
+  if(cp){ if($('#cpop').dataset.for==='p:'+cp.dataset.cp){ hideCPop(); return; } const r=cp.getBoundingClientRect(); showPersonPop(cp.dataset.cp, r.left+r.width/2, r.bottom); return; }
   if(ev.target.closest('.grip')) return;
   if(SET.mode==='dur') return;
   const s = ev.target.closest('[data-sel]') || ev.target.closest('.dh');
@@ -1723,7 +1941,7 @@ $('#presets').addEventListener('click', async ev=>{
   const pr = presetList()[+b.dataset.pi];
   const my = ++runId;
   $('#presetBox').open=false; UI.preset=false; lsSet(UI_KEY, UI); ZOOM=1;
-  list=[]; selected=[]; colorIdx={}; nextColor=0;
+  list=[]; selected=[]; colorIdx={}; nextColor=0; resetGroups(); newGroup(pr.name);
   if($('#sort').value==='added') $('#sort').value='birth';
   if(pr.ids){ await ensureIds(pr.ids); if(my!==runId) return; pr.ids.forEach(id=>add(PEOPLE[id],true)); render(); syncURL(); return; }
   render();
@@ -1751,7 +1969,7 @@ $('#catFilter').addEventListener('input', updateChips);
 $('#chips').addEventListener('click', ev=>{ const c=ev.target.closest('[data-cid]'); if(!c) return;
   const id=c.dataset.cid; if(list.includes(id)) removeId(id); else add(PEOPLE[id]); });
 $('#catTop').addEventListener('click', ()=>{
-  const c = DATA.categories[+$('#cat').value||0]; let n=0;
+  const c = DATA.categories[+$('#cat').value||0]; let n=0; newGroup(c.name);
   for(const id of c.ids){ if(n>=10) break; if(!list.includes(id) && PEOPLE[id] && PEOPLE[id].b!=null){ add(PEOPLE[id],true); n++; } }
   render(); syncURL();
 });
@@ -1884,10 +2102,12 @@ async function pickThing(x){
 /* ---------- まとめて ---------- */
 $('#bulkGo').addEventListener('click', async ()=>{
   const names = $('#bulk').value.split(/\n|、|,/).map(s=>s.trim()).filter(Boolean);
-  const my = ++runId;
-  const r = await resolveMany(names, my, p=>{ add(p,true); render(); });
+  const my = ++runId; if(!names.length) return;
+  const pa=ACTIVE, gN=newGroup(names[0]+(names.length>1?' ほか':''));
+  const r = await resolveMany(names, my, p=>{ if(!list.includes(p.id) && p.b!=null) GRP[p.id]=gN; add(p,true); render(); });
+  dropIfEmpty(gN, pa);
   if(r.stopped) return;
-  syncURL(); toast(r.miss.length ? '見つからない：'+r.miss.join('、') : 'できた！');
+  render(); syncURL(); toast(r.miss.length ? '見つからない：'+r.miss.join('、') : 'できた！');
   if(!r.miss.length) $('#bulk').value='';
 });
 
@@ -1927,7 +2147,7 @@ function applySet(){
   document.documentElement.dataset.theme = SET.theme;
   document.documentElement.dataset.font = SET.font; loadFont(SET.font);
   document.documentElement.style.setProperty('--fs', String(SET.fs||1));
-  $('#font').value = SET.font; $('#fs').value = String(SET.fs||1);
+  $('#font').value = SET.font; $('#fs').value = String(SET.fs||1); $('#cmode').value = SET.cmode;
   if(READY) lsSet(SET_KEY, SET);   // 共有URLで開いたときの設定は、その人の保存設定に上書きしない
   syncURLSoon();
 }
@@ -1945,6 +2165,7 @@ $('#gmode').addEventListener('change', ()=>{ SET.gmode=$('#gmode').value; applyS
 $('#glabel').addEventListener('change', ()=>{ SET.glabel=$('#glabel').checked; applySet(); });
 $('#eralbl').addEventListener('change', ()=>{ SET.eralbl=$('#eralbl').checked; applySet(); render(); });
 $('#theme').addEventListener('change', ()=>{ SET.theme=$('#theme').value; applySet(); render(); });
+$('#cmode').addEventListener('change', ()=>{ SET.cmode=$('#cmode').value; hideCPop(); applySet(); render(); });
 $('#sort').addEventListener('change', ()=>{ render(); syncURL(); });
 $('#era').addEventListener('change', ()=>{ render(); syncURLSoon(); });
 function syncTitle(fromH){
@@ -1959,7 +2180,7 @@ $('#titleH').addEventListener('blur', ()=>syncTitle(true));
 $('#title').addEventListener('input', ()=>syncTitle(false));
 $('#title').addEventListener('input', ()=>{ clearTimeout($('#title')._t); $('#title')._t=setTimeout(syncURL,300); });
 $('#clear').addEventListener('click', ()=>{ runId++; list.filter(id=>/^M/.test(id)).forEach(id=>delete PEOPLE[id]);
-  list=[]; events=[]; DUR=[]; selected=[]; colorIdx={}; nextColor=0; render(); syncURL(); });
+  list=[]; events=[]; DUR=[]; selected=[]; colorIdx={}; nextColor=0; resetGroups(); ECOL={}; render(); syncURL(); });
 $('#share').addEventListener('click', async ()=>{
   await syncURL();
   try{ await navigator.clipboard.writeText(location.href); toast('URLコピーした！'); }catch(e){ prompt('このURLを共有',location.href); }
@@ -2028,6 +2249,7 @@ function snapshot(){
   const item = id => { const p=PEOPLE[id]; if(!p) return null; if(isPeriod(p)) return {...p}; const o=pickFields(p); if(p.type) o.type=p.type; return o; };
   return {app:'seibotsunen-graph', version:1, saved:new Date().toISOString(),
     title:$('#title').value.trim(), order:list.slice(), items:list.map(item).filter(Boolean), events:events.map(e=>({...e})), dur:DUR.map(d=>({...d})),
+    colors:{groups:GROUPS.map(G=>({...G})), grp:Object.fromEntries(Object.entries(GRP).filter(([id])=>list.includes(id)||DUR.some(d=>d.id===id))), ecol:{...ECOL}, active:ACTIVE, gseq:GSEQ},
     selected:selected.slice(), settings:{...SET, sort:$('#sort').value, era:$('#era').value}};
 }
 $('#saveJson').addEventListener('click', ()=>{
@@ -2052,8 +2274,9 @@ $('#loadFile').addEventListener('change', async ev=>{
     events=(d.events||[]).map(e=>({...e})); events.forEach(e=>{ const m=/^E(\d+)$/.exec(e.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; });
     list=(d.order||[]).filter(id=>PEOPLE[id]); selected=(d.selected||[]).filter(id=>list.includes(id));
     colorIdx={}; nextColor=0;
+    const cc=d.colors||{}; resetGroups(); GROUPS=(cc.groups||[]).map(G=>({...G})); GRP={...(cc.grp||{})}; ECOL={...(cc.ecol||{})}; ACTIVE=cc.active||0; GSEQ=Math.max(cc.gseq||1, ...GROUPS.map(G=>G.g+1), 1);
     const s=d.settings||{};
-    Object.assign(SET, {orient:s.orient||'h', gtick:!!s.gtick, gband:!!s.gband, gmode:s.gmode||'jp', theme:s.theme||SET.theme, glabel:s.glabel!==false, eralbl:s.eralbl!==false, lpos:s.lpos||'in', font:s.font||SET.font, fs:s.fs||1, mode:s.mode||'time', dunit:s.dunit||'auto', dsort:s.dsort||'asc'});
+    Object.assign(SET, {orient:s.orient||'h', gtick:!!s.gtick, gband:!!s.gband, gmode:s.gmode||'jp', theme:s.theme||SET.theme, glabel:s.glabel!==false, eralbl:s.eralbl!==false, lpos:s.lpos||'in', font:s.font||SET.font, fs:s.fs||1, cmode:s.cmode||'group', mode:s.mode||'time', dunit:s.dunit||'auto', dsort:s.dsort||'asc'});
     if(s.sort) $('#sort').value=s.sort; if(s.era) $('#era').value=s.era;
     $('#title').value=d.title||''; syncTitle(false);
     applySet(); render(); syncURL(); toast('読み込んだ！');
