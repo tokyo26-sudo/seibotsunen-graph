@@ -170,6 +170,9 @@ textarea{width:100%;min-height:80px}
 .legend .bsw.on{outline:2.5px solid var(--ink);outline-offset:1.5px}
 .legend .cpick{display:inline-flex;align-items:center;gap:4px;font-size:calc(12px*var(--fs));color:var(--sub);border-radius:6px;padding:0 2px}
 .legend .cpick input{width:30px;height:24px;padding:0;border:1px solid var(--line);border-radius:6px;background:none}
+.colReset{margin-left:8px;font-size:calc(12px*var(--fs));padding:4px 10px}
+.legend .lreset{margin-left:auto;border-style:dashed}
+.colReset.armed{border-color:var(--accent);color:var(--accent);font-weight:700}
 .brushing #chart .bar,.brushing #chart .dh,.brushing #chart .row{cursor:copy}
 .legend .lg{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:2px 10px 2px 6px;font-size:calc(12.5px*var(--fs));color:var(--ink);cursor:pointer}
 .legend .lg i{width:calc(12px*var(--fs));height:calc(12px*var(--fs));border-radius:50%;display:inline-block}
@@ -317,7 +320,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.22</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.23</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
 <div class="wrap">
 
   <div class="panel">
@@ -372,7 +375,8 @@ textarea{width:100%;min-height:80px}
           <option value="group">まとまりごと（自動で色分け）</option><option value="each">ひとりずつ（自分で色をえらぶ）</option><option value="name">なし（ばらばらの色）</option>
         </select></label>
       </div>
-      <div class="ctrl" style="margin-top:6px"><label class="ck"><input type="checkbox" id="showLg"> 凡例をグラフに出す（画像にも写る）</label></div>
+      <div class="ctrl" style="margin-top:6px"><label class="ck"><input type="checkbox" id="showLg"> 凡例をグラフに出す（画像にも写る）</label>
+        <button id="colReset" class="colReset" title="まとまりも自分で決めた色もほどいて、一本ずつばらばらの最初の色にもどす">🔄 色をぜんぶ最初にもどす</button></div>
       <div class="lbl" style="margin-top:4px">設定を開いているあいだは、グラフの上に色づけの道具が出る（閉じるとかくれる）</div>
       <div class="sh">時代・元号</div>
       <div class="setgrid">
@@ -505,6 +509,7 @@ textarea{width:100%;min-height:80px}
         </ul></li>
       <li><b>ひとりずつ</b>：色を押して筆を持ち、帯をポチポチ押すとその色になる。● を押して1本ずつ選んでもいい。決めてない人はまとまりの色のまま。</li>
       <li><b>なし</b>：一本ずつばらばらの色。</li>
+      <li><b>最初の色にもどす</b>：「🔄 色をぜんぶ最初にもどす」を2回押すと、まとまりも自分で決めた色もほどいて、一本ずつばらばらの最初の色にもどる。</li>
       <li><b>凡例</b>：「凡例をグラフに出す」にチェックすると、設定を閉じても凡例が出る。画像にも写る。</li>
     </ul>
   </section>
@@ -1097,8 +1102,21 @@ function drawLegend(ids){
     hint = cur ? '🖌 筆を持ってる：帯を押すとその色になる（もう一度押すか Esc で筆をおく）'
                : '色を押して筆を持つ → 帯をポチポチ押すとその色に ／ 帯の ● を押して1本ずつ選んでもいい';
   }
-  el.innerHTML = `<div class="ltools">${tools}</div><div class="lhint">${hint}</div>`;
+  el.innerHTML = `<div class="ltools">${tools}<button class="colReset lreset" data-colreset="1" title="まとまりも自分で決めた色もほどいて、一本ずつばらばらの最初の色にもどす">🔄 ぜんぶ最初の色に</button></div><div class="lhint">${hint}</div>`;
 }
+// 色をぜんぶ最初にもどす（2回押しで実行）
+function resetAllColors(btn){
+  if(!btn.dataset.armed){
+    document.querySelectorAll('.colReset').forEach(b=>{ b.dataset.armed='1'; b.dataset.txt=b.textContent; b.textContent='もう一回押すと、もどす'; b.classList.add('armed'); });
+    clearTimeout(resetAllColors._t); resetAllColors._t=setTimeout(disarmReset, 3000); return;
+  }
+  disarmReset();
+  const ids=[...list, ...DUR.map(d=>d.id)];
+  resetGroups(); const g=newGroup('ぜんぶ'); ids.forEach(id=>{ GRP[id]=g; });   // ひとつのまとまり＝虹色（最初とおなじ）
+  ECOL={}; BRUSH=null; colorIdx={}; nextColor=0; hideCPop();
+  colorChanged(); toast('色をぜんぶ最初にもどした');
+}
+function disarmReset(){ clearTimeout(resetAllColors._t); document.querySelectorAll('.colReset').forEach(b=>{ if(b.dataset.armed){ b.textContent=b.dataset.txt; delete b.dataset.armed; b.classList.remove('armed'); } }); }
 function applyBrush(id){
   if(!BRUSH || !id) return false;
   if(BRUSH.g!=null){ if(!grpOf(BRUSH.g)) { BRUSH=null; return false; } GRP[id]=BRUSH.g; }
@@ -1177,6 +1195,7 @@ $('#cpop').addEventListener('input', ev=>{
 let lastColorIds=[];
 $('#legend').addEventListener('click', ev=>{
   if(!editing()) return;
+  const rs=ev.target.closest('[data-colreset]'); if(rs){ resetAllColors(rs); return; }
   if(ev.target.closest('#lgAdd')){ const g=newGroup(); BRUSH={g}; colorChanged(); toast('新しいまとまりを作った。帯を押すとここに入る'); return; }
   const ed=ev.target.closest('[data-lg]'); if(ed){ const r=ed.getBoundingClientRect(); showGroupPop(+ed.dataset.lg, r.left+r.width/2, r.bottom); return; }
   const bg=ev.target.closest('[data-brg]'); if(bg){ const g=+bg.dataset.brg; BRUSH = BRUSH&&BRUSH.g===g ? null : {g}; hideCPop(); drawLegend(lastColorIds); return; }
@@ -2360,6 +2379,7 @@ $('#glabel').addEventListener('change', ()=>{ SET.glabel=$('#glabel').checked; a
 $('#eralbl').addEventListener('change', ()=>{ SET.eralbl=$('#eralbl').checked; applySet(); render(); });
 $('#theme').addEventListener('change', ()=>{ SET.theme=$('#theme').value; applySet(); render(); });
 $('#cmode').addEventListener('change', ()=>{ SET.cmode=$('#cmode').value; BRUSH=null; hideCPop(); applySet(); render(); });
+$('#colReset').addEventListener('click', ev=>resetAllColors(ev.currentTarget));
 $('#showLg').addEventListener('change', ()=>{ SET.legend=$('#showLg').checked; applySet(); render(); });
 $('#sort').addEventListener('change', ()=>{ render(); syncURL(); });
 $('#era').addEventListener('change', ()=>{ render(); syncURLSoon(); });
