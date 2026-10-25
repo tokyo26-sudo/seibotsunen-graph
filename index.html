@@ -255,7 +255,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.17</span><span class="lbl" id="dataStat"></span></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.18</span><span class="lbl" id="dataStat"></span></header>
 <div class="wrap">
 
   <div class="panel">
@@ -264,7 +264,9 @@ textarea{width:100%;min-height:80px}
         <input type="text" id="q" placeholder="人・できごと・期間を探して追加（例：織田信長、応仁の乱）" autocomplete="off">
         <div class="dd" id="dd"></div>
       </div>
-      <span class="seg" id="orient"><button data-o="h" class="on" title="横表示（時間が左→右）">↔️</button><button data-o="v" title="縦表示（時間が上→下）">↕️</button></span>
+      <span class="seg" id="orient"><button data-o="h" class="on" title="横表示（時間が左→右）">↔️</button><button data-o="v" title="縦表示（時間が上→下）">↕️</button><button data-o="dur" title="長さくらべ（寿命・半減期など、長さだけを比べる）">📏</button></span>
+      <select id="dunit" title="目盛りの単位" style="display:none"><option value="auto">単位：自動</option><option value="s">秒</option><option value="min">分</option><option value="h">時間</option><option value="d">日</option><option value="y">年</option><option value="man">万年</option><option value="oku">億年</option><option value="log">対数</option></select>
+      <select id="dsort" title="並べ順" style="display:none"><option value="asc">短い順</option><option value="desc">長い順</option></select>
       <button class="tog" data-sec="add" aria-expanded="false">＋ 足す</button>
       <button class="tog" data-sec="set" aria-expanded="false">⚙ 設定</button>
       <span class="menu"><button id="moreBtn" title="保存・読み込みなど">⋯</button>
@@ -327,6 +329,7 @@ textarea{width:100%;min-height:80px}
 
     <div class="sec" id="sec-add" hidden>
       <details id="presetBox" open><summary>プリセット（人・入れ替え）</summary><div class="presets" id="presets"></div></details>
+      <details id="dpresetBox" style="margin-top:6px"><summary>プリセット（📏長さくらべ：寿命・半減期）</summary><div class="presets" id="dpresets"></div></details>
       <details id="ppresetBox" style="margin-top:6px"><summary>プリセット（期間・できごと・今の画面に足す）</summary><div class="presets" id="ppresets"></div></details>
       <details style="margin-top:8px" id="catBox">
         <summary>分野から選ぶ</summary>
@@ -644,6 +647,168 @@ function presetPeriod(it){
   return p;
 }
 
+/* ========== 長さくらべモード ==========
+   いつ始まったかは関係なく、「どれくらいの長さか」だけを0から並べる */
+const YS = 31557600;   // 1年（365.25日）の秒
+const DUNITS = {s:[1,'秒'], min:[60,'分'], h:[3600,'時間'], d:[86400,'日'], y:[YS,'年'], man:[1e4*YS,'万年'], oku:[1e8*YS,'億年']};
+// 「14.2年」「5〜15年」「120秒」「0.000164秒」「2.4万年」「45億年」→ [下, 上]（秒）
+function pdur(t){
+  if(!t) return null;
+  const m=/^約?\s*([\d.]+)(?:\s*[〜~]\s*([\d.]+))?\s*(マイクロ秒|秒|分|時間|日|か月|年|万年|億年)$/.exec(String(t).trim());
+  if(!m) return null;
+  const U={'マイクロ秒':1e-6,'秒':1,'分':60,'時間':3600,'日':86400,'か月':YS/12,'年':YS,'万年':1e4*YS,'億年':1e8*YS}[m[3]];
+  const a=parseFloat(m[1])*U, b=m[2]?parseFloat(m[2])*U:a;
+  return [a,b];
+}
+const nf = x => { const s = x>=100 ? Math.round(x).toLocaleString('ja-JP') : x>=10 ? (Math.round(x*10)/10).toString() : (Math.round(x*100)/100).toString(); return s; };
+function fmtDur(sec){
+  if(!(sec>0)) return '0';
+  if(sec<1e-3) return nf(sec*1e6)+'マイクロ秒';
+  if(sec<1) return nf(sec*1e3)+'ミリ秒';
+  if(sec<60) return nf(sec)+'秒';
+  if(sec<3600) return nf(sec/60)+'分';
+  if(sec<86400) return nf(sec/3600)+'時間';
+  if(sec<YS) return nf(sec/86400)+'日';
+  if(sec<1e4*YS) return nf(sec/YS)+'年';
+  if(sec<1e8*YS) return nf(sec/1e4/YS)+'万年';
+  return nf(sec/1e8/YS)+'億年';
+}
+/* プリセット：t＝ふつうの寿命・半減期（帯）、mx＝最長記録（うすく伸ばす） */
+const DUR_PRESETS = [
+ {name:'生き物の寿命', items:[
+  {n:'カゲロウ（成虫）', t:'1日', note:'成虫になってからは数時間〜数日', src:'一般的な目安'},
+  {n:'ハツカネズミ', t:'2年', mx:'4年', src:'最長：Wikipedia「Maximum life span」'},
+  {n:'ハムスター', t:'2〜3年', src:'環境省「飼う前に考えて」'},
+  {n:'ウサギ', t:'5〜15年', src:'環境省「飼う前に考えて」'},
+  {n:'イヌ', t:'14.2年', mx:'29年', src:'平均：アニコム家庭動物白書2023（2021年度）／最長：Bluey（Wikipedia）'},
+  {n:'ネコ', t:'14.7年', mx:'38年', src:'平均：アニコム家庭動物白書2023（2021年度）／最長：Creme Puff（Wikipedia）'},
+  {n:'ウマ', t:'25〜30年', mx:'62年', note:'ふつうの寿命は一般的な目安', src:'最長：Wikipedia「Maximum life span」'},
+  {n:'チンパンジー', t:'40〜50年', mx:'69年', src:'秋田市大森山動物園の資料／最長：王子動物園のジョニー（推定69歳）'},
+  {n:'ゾウ', t:'50〜60年', mx:'86年', note:'最長はアジアゾウの記録', src:'秋田市大森山動物園の資料／最長：Wikipedia「Maximum life span」'},
+  {n:'ヒト（日本人）', t:'81〜87年', mx:'122年', note:'男性81.09年・女性87.14年（2023年）。最長はジャンヌ・カルマン（122年164日）', src:'厚生労働省 簡易生命表（2023年）／Wikipedia'},
+  {n:'ゾウガメ', t:'100年', mx:'193年', note:'リクガメは100年以上生きることも。最長はセーシェルゾウガメ', src:'環境省／Wikipedia「Maximum life span」'},
+  {n:'ホッキョククジラ', t:'200年', mx:'245年', note:'推定。最大で177〜245年と見積もられている', src:'Wikipedia「Maximum life span」'},
+  {n:'ニシオンデンザメ', t:'272〜512年', note:'推定392±120年。いちばん長生きの脊椎動物とされる', src:'Wikipedia「Maximum life span」'},
+  {n:'アイスランドガイ（二枚貝「ミン」）', t:'507年', note:'1個体の記録（507±2年）', src:'Wikipedia「Maximum life span」'},
+ ]},
+ {name:'放射性物質の半減期', items:[
+  {n:'ポロニウム214', t:'0.000164秒', note:'164マイクロ秒', src:'一般的な値'},
+  {n:'酸素15', t:'120秒', src:'茨城県「核種の用語説明」'},
+  {n:'窒素13', t:'10分', src:'茨城県「核種の用語説明」'},
+  {n:'ヨウ素133', t:'21時間', src:'茨城県「核種の用語説明」'},
+  {n:'ラドン222', t:'3.8日', src:'環境省・茨城県'},
+  {n:'ヨウ素131', t:'8日', src:'環境省・茨城県（8.0日）'},
+  {n:'ベリリウム7', t:'53日', src:'茨城県「核種の用語説明」'},
+  {n:'セシウム134', t:'2.1年', src:'環境省・茨城県'},
+  {n:'コバルト60', t:'5.3年', src:'茨城県「核種の用語説明」'},
+  {n:'トリチウム（水素3）', t:'12.3年', src:'環境省（茨城県は12年）'},
+  {n:'ストロンチウム90', t:'29年', src:'環境省・茨城県'},
+  {n:'セシウム137', t:'30年', src:'環境省・茨城県'},
+  {n:'炭素14', t:'5730年', note:'5700年とする資料もある', src:'環境省（茨城県は5700年）'},
+  {n:'プルトニウム239', t:'2.4万年', src:'環境省・茨城県（24000年）'},
+  {n:'ヨウ素129', t:'1600万年', src:'茨城県「核種の用語説明」'},
+  {n:'ウラン235', t:'7億年', src:'茨城県「核種の用語説明」（7.0億年）'},
+  {n:'カリウム40', t:'13億年', src:'環境省'},
+  {n:'ウラン238', t:'45億年', src:'環境省・茨城県'},
+  {n:'トリウム232', t:'140億年', src:'茨城県（環境省は141億年）'},
+ ]},
+];
+let DUR = [];      // 長さくらべに並べてるもの {id, n, lo, hi, mx, txt, note, src, pk}
+function durFromPreset(si, ii){
+  const it=DUR_PRESETS[si].items[ii]; const T=pdur(it.t); if(!T) return null;
+  const M=it.mx?pdur(it.mx):null;
+  return {id:'D'+(manSeq++), n:it.n, lo:T[0], hi:T[1], mx:M?M[1]:null,
+    txt: it.t + (it.mx?`（最長 ${it.mx}）`:''), note:it.note||'', src:it.src||'', pk:[si,ii]};
+}
+function addDurSet(si){
+  const have=new Set(DUR.map(d=>d.n)); let n=0;
+  DUR_PRESETS[si].items.forEach((it,ii)=>{ if(have.has(it.n)) return; const d=durFromPreset(si,ii); if(d){ DUR.push(d); n++; } });
+  SET.mode='dur'; applySet();
+  toast(n ? `「${DUR_PRESETS[si].name}」を${n}こ足した（長さくらべ）` : 'もう全部入ってる');
+  render(); syncURL();
+}
+// 並べるもの：長さくらべのもの＋人（享年）
+function durRows(){
+  const rows=[];
+  for(const id of list){ const p=PEOPLE[id]; if(!p || isPeriod(p)) continue; const lf=life(p); if(lf==null || lf<0) continue;
+    rows.push({id, n:p.n, lo:lf*YS, hi:lf*YS, mx:null, txt:`享年 ${lifeFuzzy(p)?'約':''}${lf}年`, note:p.desc||'', person:1}); }
+  for(const d of DUR) rows.push(d);
+  rows.sort((a,b)=> SET.dsort==='desc' ? b.hi-a.hi : a.lo-b.lo);
+  return rows;
+}
+function autoUnit(maxSec){
+  for(const k of ['oku','man','y','d','h','min','s']) if(maxSec/DUNITS[k][0] >= 1.5) return k;
+  return 's';
+}
+const LOGTICKS=[[1e-6,'1マイクロ秒'],[1e-4,'0.1ミリ秒'],[1e-3,'1ミリ秒'],[1,'1秒'],[60,'1分'],[3600,'1時間'],[86400,'1日'],[86400*30.44,'1か月'],[YS,'1年'],[10*YS,'10年'],[100*YS,'100年'],
+  [1000*YS,'1000年'],[1e4*YS,'1万年'],[1e5*YS,'10万年'],[1e6*YS,'100万年'],[1e7*YS,'1000万年'],[1e8*YS,'1億年'],[1e9*YS,'10億年'],[1e10*YS,'100億年'],[1e11*YS,'1000億年']];
+// どんな大きさでも目盛りが増えすぎない刻み（1・2・5・10…）
+function jaBig(t){ // 2000000000 → 20億
+  if(t>=1e8) return nf(t/1e8)+'億'; if(t>=1e4) return nf(t/1e4)+'万'; return nf(t);
+}
+function durStep(span, maxTicks){
+  const raw=span/Math.max(1,maxTicks), p=Math.pow(10, Math.floor(Math.log10(raw)));
+  for(const m of [1,2,5,10]) if(m*p>=raw) return m*p;
+  return 10*p;
+}
+function renderDur(chart){
+  const rows=durRows();
+  chart.className='chart H'; document.body.classList.toggle('zoomed', ZOOM>1.01);
+  if(!rows.length){
+    geo=null; chart.innerHTML=`<div class="empty">長さくらべ：「＋ 足す」→「プリセット（長さくらべ）」を押すか、<br>人を並べると享年で比べられる。検索で「セシウム137」みたいに打つと半減期も足せる</div>`;
+    $('#info').innerHTML=''; $('#zbar').hidden=true; return;
+  }
+  $('#zbar').hidden=false;
+  const isLog = SET.dunit==='log';
+  const maxSec = Math.max(...rows.map(r=>r.mx||r.hi));
+  const minSec = Math.min(...rows.map(r=>r.lo).filter(x=>x>0));
+  const unitK = isLog ? null : (SET.dunit==='auto'||!DUNITS[SET.dunit] ? autoUnit(maxSec) : SET.dunit);
+  const U = unitK ? DUNITS[unitK][0] : 1;
+  const ax = sec => isLog ? Math.log10(Math.max(sec, 1e-12)) : sec/U;
+  let min, max;
+  if(isLog){ min=Math.floor(Math.log10(minSec))-0.3; max=Math.log10(maxSec)+0.25; }
+  else { min=0; max=maxSec/U*1.05; }
+  const narrow = window.innerWidth<=640;
+  const NW = Math.round((UI.names ? (narrow?96:150) : 24) * (SET.fs||1));
+  const baseLen = Math.max(200, chart.clientWidth - NW - 10);
+  const maxZ = isLog ? 60 : Math.max(1, (max-min)/ (minSec/U) / 4);
+  ZOOM = Math.max(1, Math.min(ZMAX, maxZ, ZOOM));
+  const LEN = Math.round(baseLen*ZOOM);
+  const P = v => ((v-min)/(max-min)*100).toFixed(3)+'%';
+  const S = (a,b) => ((b-a)/(max-min)*100).toFixed(3)+'%';
+  // 目盛り
+  let ticks=[];
+  if(isLog){ ticks = LOGTICKS.filter(([s])=>{ const v=Math.log10(s); return v>=min && v<=max; }).map(([s,l])=>[Math.log10(s), l]); }
+  else { const step=durStep(max-min, Math.max(6, Math.round(LEN/110))); for(let i=0; i*step<=max && i<5000; i++){ const t=+(i*step).toPrecision(12); ticks.push([t, (t===0?'0':(['man','oku'].includes(unitK)?nf(t):jaBig(t)))+DUNITS[unitK][1]]); } }
+  const tickLbl = ticks.map(([v,l])=>`<div class="tick" style="left:${P(v)}${v<=min+(max-min)*0.01?';transform:none':''}">${esc(l)}</div>`).join('');
+  const grid = ticks.map(([v])=>`<div class="gridl" style="left:${P(v)}"></div>`).join('');
+  const handle = r => `<span class="grip" style="visibility:hidden">⋮⋮</span><button class="x" title="消す" data-rm="${r.id}">×</button>`;
+  const left = isLog ? min : 0;
+  const rowsH = rows.map(r=>{
+    const h=colorH(r.id), c=`hsl(${h} var(--bs) var(--bl))`;
+    const a0=ax(r.lo), a1=ax(r.hi), am=r.mx?ax(r.mx):null;
+    const right = Math.max(a1, am??a1);
+    const w = Math.max(right-left, 1e-9), pc = v => ((v-left)/w*100).toFixed(2)+'%';
+    const st=[`${c} 0%`];
+    if(a1>a0){ st.push(`${c} ${pc(a0)}`, `hsl(${h} var(--bs) var(--bl) / .55) ${pc(a1)}`); } else st.push(`${c} ${pc(a1)}`);
+    if(am!=null && am>a1){ st.push(`hsl(${h} var(--bs) var(--bl) / .28) ${pc(a1)}`, `hsl(${h} var(--bs) var(--bl) / .2) ${pc(am-(am-a1)*0.15)}`, `hsl(${h} var(--bs) var(--bl) / 0) 100%`); }
+    const tip = [r.n+' '+r.txt, r.note, r.src?('出典：'+r.src):''].filter(Boolean).join('\n');
+    return `<div class="row" data-id="${r.id}">
+      <div class="name dh" data-id="${r.id}">${handle(r)}<span class="nm" title="${esc(r.n)}">${esc(r.n)}</span>${r.person?'<span class="tag">享年</span>':''}</div>
+      <div class="track"><div class="bar dead${am!=null&&am>a1?' fd':''}" style="left:${P(left)};width:${S(left,right)};background:linear-gradient(90deg, ${st.join(', ')})" title="${esc(tip)}"><span class="lb" style="left:0%"><b>${esc(r.n)}</b>${esc(r.txt)}</span></div>
+      <span class="lbo"><b>${esc(r.n)}</b><span>${esc(r.txt)}</span></span></div></div>`;
+  }).join('');
+  chart.style.setProperty('--namew', NW+'px');
+  chart.innerHTML = `<div class="hscroll"><div class="hinner" style="width:${NW+LEN+10}px">
+    <div class="axis"><div class="namecol"></div><div class="atrack" id="atrack">
+      <div class="arow tk" id="tkrow">${tickLbl}<div class="cyear" id="cyear"></div></div>
+    </div></div>
+    <div class="body" id="cbody"><div class="bg">${grid}<div class="cline" id="cline"></div></div>${rowsH}</div></div></div>`;
+  $('#info').innerHTML = isLog ? '対数の目盛り：1秒・1分・1日・1年・100年…が同じ間かくで並ぶ ／ 濃い帯＝ふつうの寿命・半減期、うすく伸びた先＝最長記録'
+                               : `目盛りの単位：${DUNITS[unitK][1]} ／ 濃い帯＝ふつうの寿命・半減期、うすく伸びた先＝最長記録 ／ 短すぎて見えないものは「対数」にすると見える`;
+  return {min, max, LEN, NW, isLog, U, bars: rows.map(r=>({p:{id:r.id}, g:{left, right:Math.max(ax(r.hi), r.mx?ax(r.mx):ax(r.hi))}}))};
+}
+
 /* ---------- 状態 ---------- */
 let DATA = null;
 const PEOPLE = {};          // id -> 人（と、自分で足した期間 type:'period'）
@@ -652,7 +817,7 @@ let events = [];            // できごと {id,n,y}
 let selected = [];
 let colorIdx = {}, nextColor = 0, manSeq = 1;
 const SET_KEY='sbg_view_v1';
-const SET = Object.assign({font:'sys', fs:1, orient:'h', gtick:false, gband:false, vscale:1, gmode:'jp', theme:'auto', glabel:true, eralbl:true, lpos:'in'}, lsGet(SET_KEY)||{});
+const SET = Object.assign({mode:'time', dunit:'auto', dsort:'asc', font:'sys', fs:1, orient:'h', gtick:false, gband:false, vscale:1, gmode:'jp', theme:'auto', glabel:true, eralbl:true, lpos:'in'}, lsGet(SET_KEY)||{});
 
 /* ---------- 小物 ---------- */
 function $(s){ return document.querySelector(s); }
@@ -834,6 +999,7 @@ function add(p, silent){
   if(!silent){ render(); syncURL(); }
 }
 function removeId(id){
+  if(/^D/.test(id)){ DUR=DUR.filter(d=>d.id!==id); render(); syncURL(); return; }
   list=list.filter(x=>x!==id); selected=selected.filter(x=>x!==id);
   if(/^M/.test(id)) delete PEOPLE[id];
   render(); syncURL();
@@ -843,9 +1009,12 @@ let READY=false;            // 起動が終わるまでURLは書きかえない�
 function syncURLSoon(){ clearTimeout(syncURLSoon._t); syncURLSoon._t=setTimeout(syncURL, 400); }
 // 見た目の設定をURL用の短い文字に：向き-色-元号-ちぇっく-背景-並べ順
 function viewCode(){ const f=(SET.gtick?1:0)+(SET.gband?2:0)+(SET.glabel?4:0)+(SET.eralbl?8:0);
-  return [SET.orient, SET.theme, SET.gmode, f, $('#era').value, $('#sort').value, SET.lpos, SET.font, String(SET.fs||1)].join('-'); }
+  return [SET.orient, SET.theme, SET.gmode, f, $('#era').value, $('#sort').value, SET.lpos, SET.font, String(SET.fs||1), SET.mode==='dur'?'d':'t', SET.dunit, SET.dsort].join('-'); }
 function readViewCode(v){
-  const [o,th,g,f,era,sort,lp,fo,fz]=(v||'').split('-'); if(!o) return;
+  const [o,th,g,f,era,sort,lp,fo,fz,md,du,ds]=(v||'').split('-'); if(!o) return;
+  if(md==='d') SET.mode='dur'; else if(md==='t') SET.mode='time';
+  if(['auto','s','min','h','d','y','man','oku','log'].includes(du)) SET.dunit=du;
+  if(ds==='asc'||ds==='desc') SET.dsort=ds;
   if(['sys','ud','min','maru','hand'].includes(fo)) SET.font=fo;
   if(['0.85','1','1.25','1.6'].includes(fz)) SET.fs=+fz;
   if(['in','after','before'].includes(lp)) SET.lpos=lp;
@@ -874,6 +1043,7 @@ function packState(){
     return ['p', p.n, p.b, p.d]; });
   const E=events.map(e=>{ if(e.pre){ const k=presetKey(e,'events'); if(k) return k; } return ['e', e.n, e.y]; });
   const o={L, v:viewCode()};
+  if(DUR.length) o.D=DUR.map(d=>d.pk ? d.pk : ['h', d.n, d.lo, d.hi, d.mx, d.src||'', d.q||'']);
   if(E.length) o.E=E;
   const t=$('#title').value.trim(); if(t) o.t=t;
   const sel=selected.map(id=>list.indexOf(id)).filter(i=>i>=0); if(sel.length) o.s=sel;
@@ -889,6 +1059,11 @@ async function unpackState(o){
     const id='M'+(manSeq++);
     if(Array.isArray(x) && x[0]==='p'){ PEOPLE[id]={id, n:x[1], type:'period', b:x[2], d:x[3]}; ids.push(id); continue; }
     if(Array.isArray(x) && typeof x[0]==='number'){ const it=(PERIOD_PRESETS[x[0]]||{}).items?.[x[1]]; const q=it&&presetPeriod(it); if(q){ PEOPLE[id]={id,...q,pre:1,pk:x}; ids.push(id); } }
+  }
+  DUR=[];
+  for(const x of o.D||[]){
+    if(Array.isArray(x) && typeof x[0]==='number'){ const d=DUR_PRESETS[x[0]]&&DUR_PRESETS[x[0]].items[x[1]] ? durFromPreset(x[0],x[1]) : null; if(d) DUR.push(d); }
+    else if(Array.isArray(x) && x[0]==='h') DUR.push({id:'D'+(manSeq++), n:x[1], lo:x[2], hi:x[3], mx:x[4], txt:fmtDur(x[2])+(x[3]>x[2]?'〜'+fmtDur(x[3]):''), src:x[5]||'', q:x[6]||'', note:''});
   }
   for(const x of o.E||[]){
     const id='E'+(manSeq++);
@@ -1021,7 +1196,7 @@ function viewInfo(){
   const len = geo.len, span=geo.max-geo.min;
   const vis = geo.V ? sc.clientHeight-geo.HEAD : sc.clientWidth-geo.NW;
   const pos = geo.V ? sc.scrollTop : sc.scrollLeft;
-  return {sc, len, vis, pos, span, center: geo.min + (pos+vis/2)/len*span};
+  return {sc, len, vis, pos, span, center: geo.min + (pos+vis/2)/len*span, dur:!!geo.dur};
 }
 function render(){
   const chart = $('#chart');
@@ -1032,6 +1207,18 @@ function render(){
   document.body.classList.toggle('fold', !UI.names);
   document.body.classList.toggle('zoomed', ZOOM>1.01);
   $('#namesBtn').setAttribute('aria-pressed', UI.names?'true':'false');
+  const anchorOk = anchor && (!prev || !!prev.dur === (SET.mode==='dur'));   // ちがうもーどの場所は使わない
+  if(SET.mode==='dur'){
+    updateChips(); drawManList();
+    const r=renderDur(chart); if(!r) return;
+    geo={min:r.min, max:r.max, V:false, len:r.LEN, NW:r.NW, HEAD:0, dur:r};
+    fitLabels();
+    const sc=chart.querySelector('.hscroll');
+    if(sc){ sc.addEventListener('scroll', onScroll, {passive:true});
+      if(anchorOk){ const vis=sc.clientWidth-r.NW; sc.scrollLeft=Math.max(0,(anchor.y-r.min)/(r.max-r.min)*r.LEN - anchor.f*vis); } }
+    drawMini(r.bars, r.min, r.max); onScroll(); syncURLSoon();
+    return;
+  }
   chart.className = 'chart '+(V?'V':'H');
   const ps = sorted();
   updateChips(); drawManList();
@@ -1156,7 +1343,7 @@ function render(){
   const sc=chart.querySelector(V?'.vscroll':'.hscroll');
   if(sc){
     sc.addEventListener('scroll', onScroll, {passive:true});
-    if(anchor){ const vis = V ? sc.clientHeight-HEAD_ : sc.clientWidth-NW;
+    if(anchorOk){ const vis = V ? sc.clientHeight-HEAD_ : sc.clientWidth-NW;
       const pos = (anchor.y-min)/(max-min)*LEN - anchor.f*vis;
       if(V) sc.scrollTop=Math.max(0,pos); else sc.scrollLeft=Math.max(0,pos); }
   }
@@ -1169,7 +1356,8 @@ function onScroll(){
   // 全体図の枠
   const w=$('#mwin'); const a=Math.max(0,v.pos/v.len), b=Math.min(1,(v.pos+v.vis)/v.len);
   w.style.left=(a*100)+'%'; w.style.width=(Math.max(.01,b-a)*100)+'%';
-  $('#mlabL').textContent=fmtY(Math.round(geo.min+a*v.span)); $('#mlabR').textContent=fmtY(Math.round(geo.min+b*v.span));
+  const lab = x => geo.dur ? (geo.dur.isLog ? fmtDur(10**x) : fmtDur(Math.max(0,x)*geo.dur.U)) : fmtY(Math.round(x));
+  $('#mlabL').textContent=lab(geo.min+a*v.span); $('#mlabR').textContent=lab(geo.min+b*v.span);
   // 帯の始まりが見えないときは、名前を見えてるはしに寄せる
   const V=geo.V;
   document.querySelectorAll(V?'#chart .col .bar':'#chart .row .bar').forEach(bar=>{
@@ -1313,6 +1501,13 @@ function onMove(ev){
   const f = V ? (ev.clientY - r.top)/r.height : (ev.clientX - r.left)/r.width;
   const cl=$('#cline'), cy=$('#cyear');
   if(f<0||f>1){ hideCursor(); return; }
+  if(geo.dur){
+    const x = geo.min + f*(geo.max-geo.min), pp=(f*100)+'%';
+    const sec = geo.dur.isLog ? 10**x : Math.max(0,x)*geo.dur.U;
+    cl.style.display='block'; cy.style.display='block'; cy.textContent=fmtDur(sec); cl.style.left=pp; cy.style.left=pp;
+    const w=cy.offsetWidth, xx=f*r.width; cy.style.transform=`translateX(${xx-w/2<0?-xx: xx+w/2>r.width? -(w-(r.width-xx)) : -w/2}px)`;
+    return;
+  }
   const y = Math.round(geo.min + f*(geo.max-geo.min));
   const p = ((y-geo.min)/(geo.max-geo.min)*100)+'%';
   cl.style.display='block'; cy.style.display='block'; cy.textContent = yearLabel2(y);
@@ -1425,6 +1620,7 @@ $('#chart').addEventListener('click', ev=>{
   }
   const rm = ev.target.closest('[data-rm]'); if(rm){ removeId(rm.dataset.rm); return; }
   if(ev.target.closest('.grip')) return;
+  if(SET.mode==='dur') return;
   const s = ev.target.closest('[data-sel]') || ev.target.closest('.dh');
   if(s){
     const id = s.dataset.sel || s.dataset.id;
@@ -1437,7 +1633,7 @@ $('#chart').addEventListener('click', ev=>{
 /* ---------- 検索 ---------- */
 const q=$('#q'), dd=$('#dd'); let ddItems=[], ddOn=0, searchSeq=0;
 // 候補：{kind:'person', p} か {kind:'event'|'period'|'none', t}
-const TAG={person:'人', event:'できごと・線', period:'期間・帯', none:'年なし'};
+const TAG={person:'人', event:'できごと・線', period:'期間・帯', none:'年なし', half:'📏半減期'};
 function showDD(items, msg){
   ddItems=items; ddOn=0;
   if(!items.length && !msg){ dd.style.display='none'; return; }
@@ -1445,7 +1641,7 @@ function showDD(items, msg){
     if(r.kind==='person'){ const p=r.p;
       return `<div class="it${i===0?' on':''}" data-i="${i}"><b>${esc(p.n)}</b>　${esc(birthTxt(p))}–${p.d!=null?esc(deathTxt(p)):(p.du||p.b<CUR-115?'?':'存命')}<span class="tg">人</span><small>${esc(p.desc||'')}</small></div>`; }
     const x=r.t;
-    return `<div class="it${i===0?' on':''}${x.kind==='none'?' off':''}" data-i="${i}"><b>${esc(x.n)}</b>　${x.a==null?'':esc(fmtY(x.a)+(x.kind==='period'?'–'+(x.open?'':fmtY(x.b)):''))}<span class="tg">${TAG[x.kind]}</span><small>${esc(x.desc)}</small></div>`;
+    return `<div class="it${i===0?' on':''}${x.kind==='none'?' off':''}" data-i="${i}"><b>${esc(x.n)}</b>　${x.kind==='half'?esc(fmtDur(x.hl)):x.a==null?'':esc(fmtY(x.a)+(x.kind==='period'?'–'+(x.open?'':fmtY(x.b)):''))}<span class="tg">${TAG[x.kind]}</span><small>${esc(x.desc)}</small></div>`;
   }).join('') + (msg?`<div class="msg">${esc(msg)}</div>`:'');
   dd.style.display='block';
 }
@@ -1460,7 +1656,7 @@ async function searchAll(v){
     else out.push({kind:x.kind, t:x, n:x.n});
   }
   // 名前がぴったり → 人 → 期間・できごと → 年なし
-  const rank=r=>(r.n===v?0:10)+({person:0, period:1, event:1, none:5}[r.kind]);
+  const rank=r=>(r.n===v?0:10)+({person:0, half:1, period:1, event:1, none:5}[r.kind]);
   return out.map((r,i)=>({r,i})).sort((a,b)=>rank(a.r)-rank(b.r)||a.i-b.i).map(o=>o.r);
 }
 q.addEventListener('input', ()=>{
@@ -1510,6 +1706,8 @@ async function resolveMany(names, my, onFound){
 
 /* ---------- プリセット ---------- */
 function presetList(){ return (DATA && DATA.presets && DATA.presets.length) ? DATA.presets : BUILTIN_PRESETS; }
+function drawDPresets(){ $('#dpresets').innerHTML = DUR_PRESETS.map((p,i)=>`<button data-dpi="${i}">${esc(p.name)}</button>`).join(''); }
+$('#dpresets').addEventListener('click', ev=>{ const b=ev.target.closest('[data-dpi]'); if(b) addDurSet(+b.dataset.dpi); });
 function drawPPresets(){
   $('#ppresets').innerHTML = PERIOD_PRESETS.map((p,i)=>`<button data-ppi="${i}">${esc(p.name)}</button>`).join('');
 }
@@ -1621,12 +1819,13 @@ $('#manList').addEventListener('click', ev=>{
 
 /* ---------- Wikidataで出来事・期間を探す ---------- */
 function thingsQuery(ids){
-  return `SELECT ?p ?jl ?el ?jd ?h ?k ?s ?rank ?t ?prec WHERE {
+  return `SELECT ?p ?jl ?el ?jd ?h ?hl ?k ?s ?rank ?t ?prec WHERE {
   VALUES ?p { ${ids.map(x=>'wd:'+x).join(' ')} }
   OPTIONAL { ?p rdfs:label ?jl FILTER(LANG(?jl)="ja") }
   OPTIONAL { ?p rdfs:label ?el FILTER(LANG(?el)="en") }
   OPTIONAL { ?p schema:description ?jd FILTER(LANG(?jd)="ja") }
   OPTIONAL { ?p wdt:P31 wd:Q5 . BIND(1 AS ?h) }
+  OPTIONAL { ?p p:P2114/psn:P2114/wikibase:quantityAmount ?hl }
   OPTIONAL {
     VALUES (?k ?pp ?psv) { ("t" p:P585 psv:P585) ("s" p:P580 psv:P580) ("e" p:P582 psv:P582) ("s" p:P571 psv:P571) ("e" p:P576 psv:P576) ("b" p:P569 psv:P569) }
     ?p ?pp ?s . ?s wikibase:rank ?rank .
@@ -1642,6 +1841,7 @@ async function searchThings(q){
     const id=r.p.value.split('/').pop();
     const o=by[id]||(by[id]={id, n:null, en:null, desc:'', h:false, st:{t:new Map(), s:new Map(), e:new Map(), b:new Map()}});
     if(r.jl) o.n=r.jl.value; if(r.el) o.en=r.el.value; if(r.jd) o.desc=r.jd.value; if(r.h) o.h=true;
+    if(r.hl && !(o.hl>0)) o.hl=+r.hl.value;   // 半減期（秒にそろえた値）
     if(r.k && r.s && o.st[r.k.value]){ const m=o.st[r.k.value]; let x=m.get(r.s.value);
       if(!x){ const rk=r.rank?r.rank.value:''; x={rank:/Preferred/.test(rk)?'p':/Deprecated/.test(rk)?'d':'n', y:null, prec:null, circa:false}; m.set(r.s.value,x); }
       if(r.t){ const y=parseYear(r.t.value); if(y!=null){ x.y=y; x.prec=r.prec?+r.prec.value:null; } } }
@@ -1656,13 +1856,19 @@ async function searchThings(q){
     else if(ok(E)){ a=E.lo; b=E.hi; }
     if(open) b=CUR;        // 終わりがない（今も続いてる国など）は今年まで
     const hasBirth = [...o.st.b.values()].some(x=>x.y!=null);
-    const kind = (o.h || hasBirth) ? 'person' : a==null ? 'none' : (b==null||b===a) ? 'event' : 'period';
-    return {id:h.id, n:o.n||o.en||h.label||h.id, desc:o.desc||h.description||'', a, b, open, kind};
+    const kind = (o.hl>0) ? 'half' : (o.h || hasBirth) ? 'person' : a==null ? 'none' : (b==null||b===a) ? 'event' : 'period';
+    return {id:h.id, n:o.n||o.en||h.label||h.id, desc:o.desc||h.description||'', a, b, open, kind, hl:o.hl};
   }).filter(Boolean);
 }
 async function pickThing(x){
   if(!x) return;
   if(x.kind==='none'){ UI.add=true; applyUI(); $('#manBox').open=true; $('#mName').value=x.n; manMsg(`「${x.n}」は年が登録されてない…ここに年を入れてネ`, true); toast('年が登録されてない…手で入れてネ'); $('#mS').focus(); return; }
+  if(x.kind==='half'){
+    if(DUR.some(d=>d.q===x.id||d.n===x.n)){ toast('もう入ってる'); return; }
+    DUR.push({id:'D'+(manSeq++), n:x.n, lo:x.hl, hi:x.hl, mx:null, txt:fmtDur(x.hl), note:'半減期', src:'Wikidata', q:x.id});
+    if(SET.mode!=='dur'){ SET.mode='dur'; ZOOM=1; applySet(); }
+    toast(`「${x.n}」の半減期（${fmtDur(x.hl)}）を足した（📏長さくらべ）`); render(); syncURL(); return;
+  }
   if(x.kind==='person'){
     try{ const got=await fetchPeople([x.id]); const p=got[x.id]; if(p && p.b!=null){ remember(p); add(p); manMsg(`「${p.n}」は人だから、人として足した`); } else manMsg('生年が登録されてない人…',true); }
     catch(e){ manMsg('Wikidataにつながらない…',true); }
@@ -1710,7 +1916,9 @@ function loadFont(k){
 
 /* ---------- 表示の切り替え ---------- */
 function applySet(){
-  document.querySelectorAll('#orient button').forEach(b=>b.classList.toggle('on', b.dataset.o===SET.orient));
+  document.querySelectorAll('#orient button').forEach(b=>b.classList.toggle('on', SET.mode==='dur' ? b.dataset.o==='dur' : b.dataset.o===SET.orient));
+  $('#dunit').style.display = $('#dsort').style.display = SET.mode==='dur' ? '' : 'none';
+  $('#dunit').value = SET.dunit; $('#dsort').value = SET.dsort;
   $('#gtick').checked = SET.gtick; $('#gband').checked = SET.gband;
   $('#gmode').value = SET.gmode; $('#theme').value = SET.theme;
   $('#glabel').checked = SET.glabel; $('#eralbl').checked = SET.eralbl; $('#lpos').value = SET.lpos;
@@ -1721,7 +1929,11 @@ function applySet(){
   if(READY) lsSet(SET_KEY, SET);   // 共有URLで開いたときの設定は、その人の保存設定に上書きしない
   syncURLSoon();
 }
-$('#orient').addEventListener('click', ev=>{ const b=ev.target.closest('[data-o]'); if(!b) return; SET.orient=b.dataset.o; applySet(); render(); });
+$('#orient').addEventListener('click', ev=>{ const b=ev.target.closest('[data-o]'); if(!b) return;
+  const o=b.dataset.o, was=SET.mode; if(o==='dur') SET.mode='dur'; else { SET.mode='time'; SET.orient=o; }
+  if(was!==SET.mode) ZOOM=1; applySet(); render(); });
+$('#dunit').addEventListener('change', ()=>{ SET.dunit=$('#dunit').value; ZOOM=1; applySet(); render(); });
+$('#dsort').addEventListener('change', ()=>{ SET.dsort=$('#dsort').value; applySet(); render(); });
 $('#gtick').addEventListener('change', ()=>{ SET.gtick=$('#gtick').checked; applySet(); render(); });
 $('#gband').addEventListener('change', ()=>{ SET.gband=$('#gband').checked; applySet(); render(); });
 $('#font').addEventListener('change', ()=>{ SET.font=$('#font').value; applySet(); render(); });
@@ -1745,7 +1957,7 @@ $('#titleH').addEventListener('blur', ()=>syncTitle(true));
 $('#title').addEventListener('input', ()=>syncTitle(false));
 $('#title').addEventListener('input', ()=>{ clearTimeout($('#title')._t); $('#title')._t=setTimeout(syncURL,300); });
 $('#clear').addEventListener('click', ()=>{ runId++; list.filter(id=>/^M/.test(id)).forEach(id=>delete PEOPLE[id]);
-  list=[]; events=[]; selected=[]; colorIdx={}; nextColor=0; render(); syncURL(); });
+  list=[]; events=[]; DUR=[]; selected=[]; colorIdx={}; nextColor=0; render(); syncURL(); });
 $('#share').addEventListener('click', async ()=>{
   await syncURL();
   try{ await navigator.clipboard.writeText(location.href); toast('URLコピーした！'); }catch(e){ prompt('このURLを共有',location.href); }
@@ -1767,7 +1979,7 @@ async function makeShot(mode){
   toast('画像を作ってる…');
   await loadShotLib();
   const v=viewInfo(); const keepZ=ZOOM, keepC=v?v.center:null;
-  if(mode==='view' && v && ZOOM>1.01) RANGE={min:geo.min + v.pos/v.len*v.span, max:geo.min + Math.min(v.len, v.pos+v.vis)/v.len*v.span};
+  if(mode==='view' && v && ZOOM>1.01 && !geo.dur) RANGE={min:geo.min + v.pos/v.len*v.span, max:geo.min + Math.min(v.len, v.pos+v.vis)/v.len*v.span};
   ZOOM=1;
   const cap=$('#cap'); cap.classList.add('capturing');
   const t=$('#title').value.trim();
@@ -1813,12 +2025,12 @@ $('#shotCopyV').addEventListener('click', async ()=>{
 function snapshot(){
   const item = id => { const p=PEOPLE[id]; if(!p) return null; if(isPeriod(p)) return {...p}; const o=pickFields(p); if(p.type) o.type=p.type; return o; };
   return {app:'seibotsunen-graph', version:1, saved:new Date().toISOString(),
-    title:$('#title').value.trim(), order:list.slice(), items:list.map(item).filter(Boolean), events:events.map(e=>({...e})),
+    title:$('#title').value.trim(), order:list.slice(), items:list.map(item).filter(Boolean), events:events.map(e=>({...e})), dur:DUR.map(d=>({...d})),
     selected:selected.slice(), settings:{...SET, sort:$('#sort').value, era:$('#era').value}};
 }
 $('#saveJson').addEventListener('click', ()=>{
   const d=snapshot();
-  if(!d.items.length && !d.events.length){ toast('まだ何も並んでない…'); return; }
+  if(!d.items.length && !d.events.length && !d.dur.length){ toast('まだ何も並んでない…'); return; }
   const t=new Date(), ymd=`${t.getFullYear()}${String(t.getMonth()+1).padStart(2,'0')}${String(t.getDate()).padStart(2,'0')}`;
   const name=((d.title||'生没年グラフ').replace(/[\\/:*?"<>|]/g,'_'))+'_'+ymd+'.json';
   const blob=new Blob([JSON.stringify(d,null,1)],{type:'application/json'});
@@ -1834,11 +2046,12 @@ $('#loadFile').addEventListener('change', async ev=>{
     runId++;
     list.filter(id=>/^M/.test(id)).forEach(id=>delete PEOPLE[id]);
     for(const it of d.items||[]){ if(!it || !it.id) continue; PEOPLE[it.id]={...it}; const m=/^[ME](\d+)$/.exec(it.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; }
+    DUR=(d.dur||[]).map(x=>({...x})); DUR.forEach(x=>{ const m=/^D(\d+)$/.exec(x.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; });
     events=(d.events||[]).map(e=>({...e})); events.forEach(e=>{ const m=/^E(\d+)$/.exec(e.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; });
     list=(d.order||[]).filter(id=>PEOPLE[id]); selected=(d.selected||[]).filter(id=>list.includes(id));
     colorIdx={}; nextColor=0;
     const s=d.settings||{};
-    Object.assign(SET, {orient:s.orient||'h', gtick:!!s.gtick, gband:!!s.gband, gmode:s.gmode||'jp', theme:s.theme||SET.theme, glabel:s.glabel!==false, eralbl:s.eralbl!==false, lpos:s.lpos||'in', font:s.font||SET.font, fs:s.fs||1});
+    Object.assign(SET, {orient:s.orient||'h', gtick:!!s.gtick, gband:!!s.gband, gmode:s.gmode||'jp', theme:s.theme||SET.theme, glabel:s.glabel!==false, eralbl:s.eralbl!==false, lpos:s.lpos||'in', font:s.font||SET.font, fs:s.fs||1, mode:s.mode||'time', dunit:s.dunit||'auto', dsort:s.dsort||'asc'});
     if(s.sort) $('#sort').value=s.sort; if(s.era) $('#era').value=s.era;
     $('#title').value=d.title||''; syncTitle(false);
     applySet(); render(); syncURL(); toast('読み込んだ！');
@@ -1859,7 +2072,7 @@ $('#dataFile').addEventListener('change', async ev=>{
 });
 
 (async function init(){
-  applySet(); applyUI(); syncManForm(); drawPresets(); drawPPresets(); drawCats();
+  applySet(); applyUI(); syncManForm(); drawPresets(); drawPPresets(); drawDPresets(); drawCats();
   try{ const r = await fetch(DATA_URL,{cache:'no-cache'}); if(r.ok) useData(await r.json()); }catch(e){}
   if(!DATA) $('#dataStat').textContent = '手元データなし（Wikidataから直接さがす）';
   const sp = new URL(location.href).searchParams;
