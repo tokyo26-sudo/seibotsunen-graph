@@ -153,6 +153,17 @@ textarea{width:100%;min-height:80px}
 .evlb:hover{text-decoration:underline}
 .evpop{position:fixed;z-index:61;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 24px rgba(0,0,0,.22);padding:8px 10px;font-size:calc(13px*var(--fs));display:none;max-width:280px}
 .evpop .t{font-weight:700;margin-bottom:2px}
+.bcard{position:fixed;z-index:61;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.22);padding:10px 12px 9px;font-size:calc(13px*var(--fs));display:none;width:min(300px,calc(100vw - 16px));line-height:1.55}
+.bcard .t{font-weight:700;font-size:calc(15px*var(--fs));padding-right:22px;display:flex;align-items:center;gap:6px}
+.bcard .t i{width:calc(11px*var(--fs));height:calc(11px*var(--fs));border-radius:50%;flex:none}
+.bcard .y{color:var(--sub);font-size:calc(12.5px*var(--fs))}
+.bcard .d{margin-top:5px}
+.bcard .d.none{color:var(--sub);font-size:calc(12px*var(--fs))}
+.bcard .nt{margin-top:5px;color:var(--sub);font-size:calc(11.5px*var(--fs))}
+.bcard .lk{margin-top:7px;display:flex;gap:12px;flex-wrap:wrap;font-size:calc(12.5px*var(--fs))}
+.bcard .lk a{color:var(--accent);text-decoration:none}
+.bcard .lk a:hover{text-decoration:underline}
+.bcard .cx{position:absolute;top:4px;right:6px;border:0;background:none;color:var(--sub);font-size:calc(18px*var(--fs));cursor:pointer;padding:2px 5px;line-height:1}
 .grip.cg{width:calc(13px*var(--fs));height:calc(13px*var(--fs));padding:0;border-radius:50%;background:var(--c);flex:none;display:inline-block;box-shadow:0 0 0 1.5px var(--panel),0 0 0 2.5px color-mix(in srgb,var(--ink) 25%,transparent);cursor:pointer;margin:0 3px}
 .grip.cg:hover{background:var(--c);transform:scale(1.18)}
 .dh .grip.cg{opacity:1;letter-spacing:0}
@@ -317,7 +328,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.24</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.26</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
 <div class="wrap">
 
   <div class="panel">
@@ -448,6 +459,7 @@ textarea{width:100%;min-height:80px}
 <div class="toast" id="toast"></div>
 <div class="gpop" id="gpop"></div>
 <div class="evpop" id="evpop"></div>
+<div class="bcard" id="bcard"></div>
 <div class="cpop" id="cpop"></div>
 <dialog id="help" aria-labelledby="helpT">
   <div class="hwrap">
@@ -477,6 +489,7 @@ textarea{width:100%;min-height:80px}
   <section id="h-see"><h3>見る</h3>
     <ul>
       <li><b>なぞる</b>：グラフの上でマウスを動かす（指でさわる）と、その年と、その年に各人が何歳だったかが出る。</li>
+      <li><b>カード</b>：帯を押すと、そばにカードが出て、生没年・かんたんなプロフィール・諸説のメモと、Wikipedia・Wikidataへのリンクが出る。外を押すか × でとじる。</li>
       <li><b>重なりを調べる</b>：帯を2本クリックすると、同時に生きてた期間（重なってた期間）が出る。もう一度押すと選ぶのをやめる。</li>
       <li><b>拡大・縮小</b>：「−」「＋」「全体」ボタン、ctrl＋ほいーる、すまほは2本指。</li>
       <li><b>動かす</b>：まうすでグラフをつかんで引っぱる。すまほは指でそのまま。上の細長い全体図の枠をつまんで動かしてもいい。枠のはしを引っぱると拡大・縮小。</li>
@@ -556,6 +569,7 @@ textarea{width:100%;min-height:80px}
     <ul>
       <li>人の生没年は <a href="https://www.wikidata.org/" target="_blank" rel="noopener">Wikidata</a>（CC0）から、その場で取ってくる。まちがいがあることもある。</li>
       <li>期間・できごと・寿命・半減期のプリセットは、教科書・辞典・環境省などの資料をもとに作った。帯にのせると、メモや出典が出る。</li>
+      <li>Wikidataが混んでいると答えがおそくなる。そのときは「混んでる」と出るので、少し待ってもう一度。一度さがした言葉はおぼえているので、2回目からはすぐ出る。</li>
       <li>同じ場所に seibotsunen-data.json を置くと、人の検索が速くなって「分野から選ぶ」も使える。</li>
     </ul>
   </section>
@@ -1247,13 +1261,36 @@ const cache = lsGet(CACHE_KEY) || {};
 Object.assign(PEOPLE, cache);
 
 /* ---------- Wikidata ---------- */
-async function wdSearch(q){
-  const u = WD_API+'?action=wbsearchentities&format=json&origin=*&type=item&limit=10&language=ja&uselang=ja&search='+encodeURIComponent(q);
-  const r = await fetch(u); const j = await r.json(); return j.search || [];
+// Wikidataが混んでる（429）・時間切れ（500/503/504）・つながらない → 少し待って1回だけやりなおす
+class BusyError extends Error { constructor(m){ super(m); this.busy=true; } }
+const isAbort = e => e && (e.name==='AbortError' || e.name==='TimeoutError' && e.byUser);
+async function fetchRetry(url, signal, tries=2){
+  for(let t=0; t<tries; t++){
+    let r;
+    try{
+      const tm = AbortSignal.timeout ? AbortSignal.timeout(30000) : null;            // 30秒で見切る
+      const sig = signal && tm && AbortSignal.any ? AbortSignal.any([signal, tm]) : (signal || tm || undefined);
+      r = await fetch(url, {signal: sig});
+    }catch(e){
+      if(signal && signal.aborted) throw e;                                          // 新しい検索に切りかわった
+      if(t<tries-1){ await sleep(1500); continue; }
+      throw new BusyError('Wikidataにつながらない（時間切れ）');
+    }
+    if(r.ok) return r;
+    if([429,500,502,503,504].includes(r.status) && t<tries-1){
+      const ra = +r.headers.get('Retry-After'); await sleep(ra>0 && ra<20 ? ra*1000 : 1500);
+      if(signal && signal.aborted) throw new DOMException('aborted','AbortError');
+      continue;
+    }
+    throw new BusyError('Wikidataが混んでる（'+r.status+'）');
+  }
 }
-async function sparql(q){
-  const r = await fetch(WD_SPARQL+'?format=json&query='+encodeURIComponent(q));
-  if(!r.ok) throw new Error('SPARQL '+r.status);
+async function wdSearch(q, signal){
+  const u = WD_API+'?action=wbsearchentities&format=json&origin=*&type=item&limit=8&language=ja&uselang=ja&search='+encodeURIComponent(q);
+  const r = await fetchRetry(u, signal); const j = await r.json(); return j.search || [];
+}
+async function sparql(q, signal){
+  const r = await fetchRetry(WD_SPARQL+'?format=json&query='+encodeURIComponent(q), signal);
   return (await r.json()).results.bindings;
 }
 /* ---------- 人物の詳しい取得（精度・頃・諸説・不明・活動時期） ---------- */
@@ -1319,10 +1356,11 @@ function digestPeople(rows, out){
     if(r.jl) o.n=r.jl.value; if(r.el) o._en=r.el.value; if(r.jd) o.desc=r.jd.value;
     if(r.sl) o.links=+r.sl.value;
     if(r.k && r.s){
-      const m=o._st[r.k.value]; let st=m.get(r.s.value);
+      const m=o._st[r.k.value];
+      if(m){ let st=m.get(r.s.value);
       if(!st){ const rk=r.rank?r.rank.value:''; st={rank:/Preferred/.test(rk)?'p':/Deprecated/.test(rk)?'d':'n', y:null, prec:null, circa:false}; m.set(r.s.value,st); }
       if(r.t){ const y=parseYear(r.t.value); if(y!=null){ st.y=y; st.prec=r.prec?+r.prec.value:null; } }
-      if(r.circa && r.circa.value.endsWith(WD_CIRCA)) st.circa=true;
+      if(r.circa && r.circa.value.endsWith(WD_CIRCA)) st.circa=true; }
     }
   }
 }
@@ -1390,7 +1428,8 @@ function localMatch(q, limit=6){
 async function resolveName(name){
   name=name.trim(); if(!name) return null;
   const loc = localMatch(name,1); if(loc.length && loc[0].n===name) return loc[0];
-  try{ const r = await searchHumans(name); if(r.length){ remember(r[0]); return r[0]; } }catch(e){}
+  try{ const r = await searchHumans(name); if(r.length){ remember(r[0]); return r[0]; } }
+  catch(e){ if(loc[0]) return loc[0]; if(e.busy) throw e; }
   return loc[0] || null;
 }
 async function ensureIds(ids){
@@ -1406,6 +1445,7 @@ function add(p, silent){
   if(!silent){ render(); syncURL(); }
 }
 function removeId(id){
+  if($('#bcard').dataset.id===id) hideCard();
   if(/^D/.test(id)){ DUR=DUR.filter(d=>d.id!==id); render(); syncURL(); return; }
   list=list.filter(x=>x!==id); selected=selected.filter(x=>x!==id);
   if(/^M/.test(id)) delete PEOPLE[id];
@@ -2016,6 +2056,58 @@ function showEvPop(id, x, y){
   pop.style.top=(y+ph+14 < window.innerHeight ? y+12 : Math.max(4, y-ph-12))+'px';
 }
 function hideEvPop(){ $('#evpop').style.display='none'; }
+/* ---------- 帯のカード（プロフィール） ---------- */
+const LINKS = {};   // Qid → {ja, en, desc}（Wikipediaのページ名）
+async function wdLinks(qid){
+  if(LINKS[qid]) return LINKS[qid];
+  const u = WD_API+'?action=wbgetentities&format=json&origin=*&props=sitelinks|descriptions&sitefilter=jawiki|enwiki&languages=ja&ids='+qid;
+  const r = await fetchRetry(u); const e = ((await r.json()).entities||{})[qid] || {};
+  const sl = e.sitelinks||{};
+  return LINKS[qid] = {ja: sl.jawiki && sl.jawiki.title, en: sl.enwiki && sl.enwiki.title, desc: e.descriptions && e.descriptions.ja && e.descriptions.ja.value};
+}
+function cardLinks(qid, L){
+  const w = L && L.ja ? `<a href="https://ja.wikipedia.org/wiki/${encodeURIComponent(L.ja)}" target="_blank" rel="noopener">Wikipediaで見る ↗</a>`
+          : L && L.en ? `<a href="https://en.wikipedia.org/wiki/${encodeURIComponent(L.en)}" target="_blank" rel="noopener">Wikipedia（英語）で見る ↗</a>` : '';
+  return w + `<a href="https://www.wikidata.org/wiki/${qid}" target="_blank" rel="noopener">Wikidata ↗</a>`;
+}
+function showCard(id, x, y){
+  const card=$('#bcard'); let name, yrs='', desc=null, note='', qid=null, src='';
+  const p=PEOPLE[id], d=DUR.find(v=>v.id===id);
+  if(p){
+    name=p.n; yrs=barOf(p).txt;
+    if(isPeriod(p)){ note=periodNote(p); qid=p.q||null; }
+    else { desc=p.desc||''; note=noteOf(p); qid=/^Q\d+$/.test(id)?id:null; }
+  } else if(d){ name=d.n; yrs=d.txt; note=d.note||''; src=d.src||''; qid=d.q||null; }
+  else return;
+  card.dataset.id=id;
+  const descHTML = desc===null ? '' : `<div class="d${desc?'':' none'}" id="bcDesc">${desc?esc(desc):(qid?'（説明を取ってる…）':'説明なし')}</div>`;
+  card.innerHTML = `<button class="cx" title="とじる">×</button>
+    <div class="t"><i style="background:${col(id)}"></i>${esc(name)}</div>
+    ${yrs?`<div class="y">${esc(yrs)}</div>`:''}${descHTML}
+    ${note?`<div class="nt">${esc(note)}</div>`:''}${src?`<div class="nt">出典：${esc(src)}</div>`:''}
+    ${qid?`<div class="lk" id="bcLinks">${cardLinks(qid, LINKS[qid])}</div>`:''}`;
+  card.style.display='block';
+  const cw=card.offsetWidth, ch=card.offsetHeight;
+  // 押した場所の横に出す（上下の帯はそのまま押せるように）
+  const right = x+18+cw+8 <= window.innerWidth;
+  let L = right ? x+18 : x-18-cw;
+  if(L<8){ L=Math.max(8, Math.min(window.innerWidth-cw-8, x-cw/2)); }
+  card.style.left=L+'px';
+  card.style.top=Math.max(8, Math.min(window.innerHeight-ch-8, y-24))+'px';
+  if(qid && !LINKS[qid]){
+    wdLinks(qid).then(L=>{
+      if(card.dataset.id!==id || card.style.display!=='block') return;
+      const lk=$('#bcLinks'); if(lk) lk.innerHTML=cardLinks(qid, L);
+      const dd=$('#bcDesc');
+      if(dd && !desc){ if(L.desc){ dd.textContent=L.desc; dd.classList.remove('none'); if(p && !isPeriod(p)) p.desc=L.desc; } else dd.textContent='説明なし'; }
+    }).catch(()=>{ const dd=$('#bcDesc'); if(dd && !desc && card.dataset.id===id) dd.textContent='説明なし（Wikidataにつながらない）'; });
+  }
+}
+function hideCard(){ $('#bcard').style.display='none'; $('#bcard').dataset.id=''; }
+$('#bcard').addEventListener('click', ev=>{ if(ev.target.closest('.cx')) hideCard(); });
+document.addEventListener('click', ev=>{ if(!ev.target.isConnected) return; if(!ev.target.closest('#bcard,[data-sel],#chart .dh,#chart .row')) hideCard(); });
+window.addEventListener('scroll', hideCard, {passive:true});
+document.addEventListener('keydown', ev=>{ if(ev.key==='Escape') hideCard(); });
 $('#evpop').addEventListener('click', ev=>{ const b=ev.target.closest('[data-evdel]'); if(!b) return;
   events=events.filter(e=>e.id!==b.dataset.evdel); hideEvPop(); render(); syncURL(); });
 document.addEventListener('click', ev=>{ if(!ev.target.closest('.evlb') && !ev.target.closest('#evpop')) hideEvPop(); });
@@ -2039,12 +2131,17 @@ $('#chart').addEventListener('click', ev=>{
   const cp = ev.target.closest('[data-cp]');
   if(cp){ if($('#cpop').dataset.for==='p:'+cp.dataset.cp){ hideCPop(); return; } const r=cp.getBoundingClientRect(); showPersonPop(cp.dataset.cp, r.left+r.width/2, r.bottom); return; }
   if(ev.target.closest('.grip')) return;
-  if(SET.mode==='dur' || editing()) return;
+  if(editing()) return;
+  if(SET.mode==='dur'){   // 長さくらべ：カードだけ
+    const r = ev.target.closest('.row[data-id]'); if(!r) return;
+    if($('#bcard').dataset.id===r.dataset.id){ hideCard(); return; }
+    showCard(r.dataset.id, ev.clientX, ev.clientY); return;
+  }
   const s = ev.target.closest('[data-sel]') || ev.target.closest('.dh');
   if(s){
     const id = s.dataset.sel || s.dataset.id;
-    if(selected.includes(id)) selected=selected.filter(x=>x!==id);
-    else { selected.push(id); if(selected.length>2) selected.shift(); }
+    if(selected.includes(id)){ selected=selected.filter(x=>x!==id); if($('#bcard').dataset.id===id) hideCard(); }
+    else { selected.push(id); if(selected.length>2) selected.shift(); showCard(id, ev.clientX, ev.clientY); }
     render(); syncURLSoon();
   }
 });
@@ -2065,10 +2162,12 @@ function showDD(items, msg){
   dd.style.display='block';
 }
 // Wikidataで人も期間もできごともまとめて探す
-async function searchAll(v){
-  const things = await searchThings(v);
-  const need = things.filter(x=>x.kind==='person' && !PEOPLE[x.id]).map(x=>x.id);
-  const ppl = need.length ? await fetchPeople(need) : {};
+// D. 一度さがした言葉はおぼえておく
+const SCACHE = new Map();
+async function searchAll(v, signal){
+  if(SCACHE.has(v)) return SCACHE.get(v);
+  const ppl = {};
+  const things = await searchThings(v, signal, ppl);
   const out=[];
   for(const x of things){
     if(x.kind==='person'){ const p=PEOPLE[x.id]||ppl[x.id]; if(p && p.b!=null){ if(!p.desc && x.desc) p.desc=x.desc; out.push({kind:'person', p, n:p.n}); } }
@@ -2076,24 +2175,38 @@ async function searchAll(v){
   }
   // 名前がぴったり → 人 → 期間・できごと → 年なし
   const rank=r=>(r.n===v?0:10)+({person:0, half:1, period:1, event:1, none:5}[r.kind]);
-  return out.map((r,i)=>({r,i})).sort((a,b)=>rank(a.r)-rank(b.r)||a.i-b.i).map(o=>o.r);
+  const res = out.map((r,i)=>({r,i})).sort((a,b)=>rank(a.r)-rank(b.r)||a.i-b.i).map(o=>o.r);
+  SCACHE.set(v, res); if(SCACHE.size>80) SCACHE.delete(SCACHE.keys().next().value);
+  return res;
 }
-q.addEventListener('input', ()=>{
+function onSearchInput(ev){
+  if((ev && ev.isComposing) || q._comp) return;          // 日本語の変換中は待つ
   const v=q.value.trim(); const seq=++searchSeq;
+  if(q._ac){ q._ac.abort(); q._ac=null; }                 // 古い検索は止める
+  clearTimeout(q._t);
   if(!v){ showDD([]); return; }
   const loc = localMatch(v).map(p=>({kind:'person', p, n:p.n}));
+  if(SCACHE.has(v)){ q._t=setTimeout(()=>runSearch(v, seq, loc), 0); return; }
   showDD(loc, 'Wikidataで探してる…');
-  clearTimeout(q._t);
-  q._t = setTimeout(async ()=>{
+  q._t = setTimeout(()=>runSearch(v, seq, loc), 600);
+}
+async function runSearch(v, seq, loc){
+    const ac = new AbortController(); q._ac = ac;
+    const slow = setTimeout(()=>{ if(seq===searchSeq) showDD(loc, 'Wikidataで探してる…（混んでるみたい、もう少し待ってネ）'); }, 6000);
     try{
-      const live = await searchAll(v);
+      const live = await searchAll(v, ac.signal);
       if(seq!==searchSeq) return;
       const seen=new Set(loc.map(r=>r.p.id));
       const merged = loc.concat(live.filter(r=>!(r.kind==='person' && seen.has(r.p.id)))).slice(0,12);
       showDD(merged, merged.length?'':'見つからない…（短くしてみてネ）');
-    }catch(e){ if(seq===searchSeq) showDD(loc, 'Wikidataにつながらない（手元のデータだけ表示）'); }
-  }, 350);
-});
+    }catch(e){
+      if(ac.signal.aborted || seq!==searchSeq) return;
+      showDD(loc, e.busy ? 'Wikidataが混んでて答えがこなかった…少し待ってもう一度打ってネ' : 'Wikidataにつながらない（手元のデータだけ表示）');
+    }finally{ clearTimeout(slow); if(q._ac===ac) q._ac=null; }
+}
+q.addEventListener('input', onSearchInput);
+q.addEventListener('compositionstart', ()=>{ q._comp=true; });
+q.addEventListener('compositionend', ()=>{ q._comp=false; onSearchInput(); });
 q.addEventListener('keydown', ev=>{
   if(dd.style.display!=='block') return;
   const its=dd.querySelectorAll('.it');
@@ -2104,25 +2217,32 @@ q.addEventListener('keydown', ev=>{
 });
 dd.addEventListener('mousedown', ev=>{ const it=ev.target.closest('.it'); if(it){ ev.preventDefault(); pick(ddItems[+it.dataset.i]); } });
 q.addEventListener('blur', ()=>setTimeout(()=>showDD([]),150));
-function pick(r){ q.value=''; showDD([]); searchSeq++;
+function pick(r){ q.value=''; showDD([]); searchSeq++; if(q._ac){ q._ac.abort(); q._ac=null; }
   if(r.kind==='person'){ remember(r.p); add(r.p); } else pickThing(r.t); }
 
 /* ---------- 名前をまとめて探す（4人ずつ同時、途中で止められる） ---------- */
 let runId=0;
 async function resolveMany(names, my, onFound){
-  const miss=[]; let next=0, done=0;
+  const miss=[], busy=[]; let next=0, done=0;
   async function worker(){
     while(next<names.length){
-      const i=next++; const p=await resolveName(names[i]);
+      const i=next++; let p=null, bz=false;
+      try{ p=await resolveName(names[i]); }catch(e){ bz=true; }
       if(my!==runId) return;
       done++; toast(`さがし中… ${done}/${names.length}`);
-      if(p) onFound(p); else miss.push(names[i]);
+      if(p) onFound(p); else (bz?busy:miss).push(names[i]);
     }
   }
-  await Promise.all(Array.from({length:Math.min(4,names.length)}, worker));
-  return {miss, stopped: my!==runId};
+  await Promise.all(Array.from({length:Math.min(2,names.length)}, worker));
+  return {miss, busy, stopped: my!==runId};
 }
 
+function manyMsg(r){
+  const a=[];
+  if(r.miss.length) a.push('見つからない：'+r.miss.join('、'));
+  if(r.busy.length) a.push('Wikidataが混んでて調べられなかった：'+r.busy.join('、')+'（少し待ってもう一度）');
+  return a.length ? a.join(' ／ ') : 'できた！';
+}
 /* ---------- プリセット ---------- */
 function presetList(){ return (DATA && DATA.presets && DATA.presets.length) ? DATA.presets : BUILTIN_PRESETS; }
 function drawDPresets(){ $('#dpresets').innerHTML = DUR_PRESETS.map((p,i)=>`<button data-dpi="${i}">${esc(p.name)}</button>`).join(''); }
@@ -2146,7 +2266,7 @@ $('#presets').addEventListener('click', async ev=>{
   render();
   const r = await resolveMany(pr.names, my, p=>{ add(p,true); render(); });
   if(r.stopped) return;
-  syncURL(); toast(r.miss.length ? '見つからない：'+r.miss.join('、') : 'できた！');
+  syncURL(); toast(manyMsg(r));
 });
 
 /* ---------- 分野 ---------- */
@@ -2238,23 +2358,27 @@ $('#manList').addEventListener('click', ev=>{
 
 /* ---------- Wikidataで出来事・期間を探す ---------- */
 function thingsQuery(ids){
-  return `SELECT ?p ?jl ?el ?jd ?h ?hl ?k ?s ?rank ?t ?prec WHERE {
+  return `SELECT ?p ?sl ?jl ?el ?jd ?h ?hl ?k ?s ?rank ?t ?prec ?circa WHERE {
   VALUES ?p { ${ids.map(x=>'wd:'+x).join(' ')} }
   OPTIONAL { ?p rdfs:label ?jl FILTER(LANG(?jl)="ja") }
   OPTIONAL { ?p rdfs:label ?el FILTER(LANG(?el)="en") }
   OPTIONAL { ?p schema:description ?jd FILTER(LANG(?jd)="ja") }
+  OPTIONAL { ?p wikibase:sitelinks ?sl }
   OPTIONAL { ?p wdt:P31 wd:Q5 . BIND(1 AS ?h) }
   OPTIONAL { ?p p:P2114/psn:P2114/wikibase:quantityAmount ?hl }
   OPTIONAL {
-    VALUES (?k ?pp ?psv) { ("t" p:P585 psv:P585) ("s" p:P580 psv:P580) ("e" p:P582 psv:P582) ("s" p:P571 psv:P571) ("e" p:P576 psv:P576) ("b" p:P569 psv:P569) }
+    VALUES (?k ?pp ?psv) { ("t" p:P585 psv:P585) ("s" p:P580 psv:P580) ("e" p:P582 psv:P582) ("s" p:P571 psv:P571) ("e" p:P576 psv:P576)
+                           ("b" p:P569 psv:P569) ("d" p:P570 psv:P570) ("f" p:P1317 psv:P1317) ("f" p:P2031 psv:P2031) ("f" p:P2032 psv:P2032) }
     ?p ?pp ?s . ?s wikibase:rank ?rank .
     OPTIONAL { ?s ?psv ?v . ?v wikibase:timeValue ?t ; wikibase:timePrecision ?prec . }
+    OPTIONAL { ?s pq:P1480 ?circa }
   }
 }`;
 }
-async function searchThings(q){
-  const hits=await wdSearch(q); if(!hits.length) return [];
-  const rows=await sparql(thingsQuery(hits.map(h=>h.id)));
+async function searchThings(q, signal, ppl){
+  const hits=await wdSearch(q, signal); if(!hits.length) return [];
+  const rows=await sparql(thingsQuery(hits.map(h=>h.id)), signal);
+  if(ppl){ const out={}; digestPeople(rows, out); for(const id in out) ppl[id]=finishPerson(out[id]); }   // 人の生没年も同じ答えから
   const by={};
   for(const r of rows){
     const id=r.p.value.split('/').pop();
@@ -2306,8 +2430,9 @@ $('#bulkGo').addEventListener('click', async ()=>{
   const r = await resolveMany(names, my, p=>{ if(!list.includes(p.id) && p.b!=null) GRP[p.id]=gN; add(p,true); render(); });
   dropIfEmpty(gN, pa);
   if(r.stopped) return;
-  render(); syncURL(); toast(r.miss.length ? '見つからない：'+r.miss.join('、') : 'できた！');
-  if(!r.miss.length) $('#bulk').value='';
+  render(); syncURL(); toast(manyMsg(r));
+  if(!r.miss.length && !r.busy.length) $('#bulk').value='';
+  else $('#bulk').value=[...r.busy, ...r.miss].join('\n');   // 残った人だけ残す（もう一度押せる）
 });
 
 /* ---------- しまえる設定・メニュー ---------- */
@@ -2408,7 +2533,7 @@ async function makeShot(mode){
   const cap=$('#cap'); cap.classList.add('capturing');
   const t=$('#title').value.trim();
   $('#credit').textContent=`生没年グラフ ｜ データ：Wikidata（CC0）ほか ｜ ${new Date().toLocaleDateString('ja-JP')}`;
-  hideCursor(); hidePop(); hideEvPop();
+  hideCursor(); hidePop(); hideEvPop(); hideCard();
   let blob=null;
   try{
     render(); await nextFrame(); fitLabels(); fitSegs(); onScroll(); hideCursor();
