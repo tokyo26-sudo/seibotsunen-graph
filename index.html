@@ -328,7 +328,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.26</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.27</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
 <div class="wrap">
 
   <div class="panel">
@@ -1256,7 +1256,7 @@ function inYear(t){ t=String(t??'').trim().replace(/年$/,''); if(!t) return nul
 const isPeriod = p => p && p.type==='period';
 
 /* ---------- キャッシュ ---------- */
-const CACHE_KEY='sbg_cache_v2';
+const CACHE_KEY='sbg_cache_v3';   // v3：日付つきの「頃」で年をぼかさないように取りなおす
 const cache = lsGet(CACHE_KEY) || {};
 Object.assign(PEOPLE, cache);
 
@@ -1298,7 +1298,7 @@ async function sparql(q, signal){
 //  b/d = 生年/没年（いちばん早い方）、b2/d2 = 幅があるときの遅い方
 //  bc/dc = 「頃」、bv/dv = 表示用の説の一覧、du = 没年「不明」と登録、f/f2 = 活動時期
 const WD_CIRCA='Q5727902';
-const PFIELDS=['b','b2','bc','bv','bq','d','d2','dc','dv','dq','du','f','f2'];
+const PFIELDS=['b','b2','bc','bv','bq','bdc','d','d2','dc','dv','dq','ddc','du','f','f2'];
 function yearRange(y, prec){
   if(prec==null||prec>=9) return [y,y];
   if(prec===8){ const lo=Math.floor(y/10)*10; return [lo,lo+9]; }
@@ -1319,18 +1319,25 @@ function summarize(list){
   // 推奨 → ふつう → （それしかなければ）非推奨、の順で使う
   const ok=list.filter(s=>s.y!=null);
   const pref=ok.filter(s=>s.rank==='p'), norm=ok.filter(s=>s.rank==='n'), dep=ok.filter(s=>s.rank==='d');
-  const known = pref.length ? pref : norm.length ? norm : dep;
+  let known = pref.length ? pref : norm.length ? norm : dep;
   const isDep = !pref.length && !norm.length && dep.length>0;
   if(!known.length) return list.some(s=>s.rank!=='d') ? {unknown:true} : null;
-  let lo=Infinity, hi=-Infinity, circa=false; const labels=[];
+  // 「1408年5月31日」と「1400年代」「15世紀」がまざってたら、ざっくりの方はただの大まかな書き方なので捨てる
+  const fine = known.filter(s=>s.prec==null || s.prec>=9);
+  if(fine.length) known = known.filter(s=>{ if(s.prec==null || s.prec>=9) return true; const [a,b]=yearRange(s.y,s.prec); return !fine.some(f=>f.y>=a && f.y<=b); });
+  let lo=Infinity, hi=-Infinity, circa=false, dayCirca=false; const labels=[];
   for(const s of known){
     const [a,b]=yearRange(s.y,s.prec); lo=Math.min(lo,a); hi=Math.max(hi,b);
-    if(s.circa || (s.prec!=null && s.prec<6)) circa=true;
-    const L=yearLabel(s.y,s.prec,s.circa); if(!labels.includes(L)) labels.push(L);
+    // 日付（月・日）までわかってる「頃」は、日にちや時刻の頃。年はぼかさない
+    const dayLevel = s.prec!=null && s.prec>=10;
+    if(s.circa && dayLevel) dayCirca=true;
+    if((s.circa && !dayLevel) || (s.prec!=null && s.prec<6)) circa=true;
+    const L=yearLabel(s.y,s.prec,s.circa && !dayLevel); if(!labels.includes(L)) labels.push(L);
   }
   if(isDep) circa=true;      // 疑わしい年なので、はしをぼかす
   const out={lo,hi,circa};
   if(isDep) out.dep=true;
+  if(dayCirca && !circa) out.dayCirca=true;
   if(labels.length>1 || circa || hi>lo) out.labels=isDep ? labels.map(l=>/頃|年代|世紀/.test(l)?l:l+'頃') : labels;
   return out;
 }
@@ -1367,8 +1374,8 @@ function digestPeople(rows, out){
 function finishPerson(o){
   const B=summarize([...o._st.b.values()]), D=summarize([...o._st.d.values()]), F=summarize([...o._st.f.values()]);
   const p={id:o.id, n:o.n||o._en||o.id, desc:o.desc, links:o.links, b:null, d:null};
-  if(B && !B.unknown){ p.b=B.lo; if(B.hi>B.lo) p.b2=B.hi; if(B.circa) p.bc=1; if(B.labels) p.bv=B.labels; if(B.dep) p.bq=1; }
-  if(D && !D.unknown){ p.d=D.lo; if(D.hi>D.lo) p.d2=D.hi; if(D.circa) p.dc=1; if(D.labels) p.dv=D.labels; if(D.dep) p.dq=1; }
+  if(B && !B.unknown){ p.b=B.lo; if(B.hi>B.lo) p.b2=B.hi; if(B.circa) p.bc=1; if(B.labels) p.bv=B.labels; if(B.dep) p.bq=1; if(B.dayCirca) p.bdc=1; }
+  if(D && !D.unknown){ p.d=D.lo; if(D.hi>D.lo) p.d2=D.hi; if(D.circa) p.dc=1; if(D.labels) p.dv=D.labels; if(D.dep) p.dq=1; if(D.dayCirca) p.ddc=1; }
   if(D && D.unknown) p.du=1;
   if(F && !F.unknown){ p.f=F.lo; if(F.hi>F.lo) p.f2=F.hi; }
   return p;
@@ -1399,6 +1406,8 @@ function noteOf(p){
   if(p.dv && p.dv.length>1) a.push('没年 諸説：'+p.dv.join('・'));
   if(p.bq) a.push('生年：Wikidataでは「疑わしい」とされてる年');
   if(p.dq) a.push('没年：Wikidataでは「疑わしい」とされてる年');
+  if(p.bdc) a.push('生まれた日・時刻は「頃」（年はたしか）');
+  if(p.ddc) a.push('亡くなった日・時刻は「頃」（年はたしか）');
   if(p.du) a.push('没年 不明');
   if(p.f!=null) a.push('活動時期：'+yearLabel(p.f,9)+(p.f2!=null?'〜'+yearLabel(p.f2,9):''));
   return a.join(' ／ ');
