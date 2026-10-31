@@ -176,6 +176,11 @@ textarea{width:100%;min-height:80px}
 .bcard .fzin input{width:100%;box-sizing:border-box;margin-top:3px}
 .bcard .fzh{font-size:calc(11px*var(--fs));color:var(--sub);margin-top:3px}
 .bcard .fzb{display:flex;gap:6px;align-items:center;margin-top:6px}
+.bcard .fzt{font-size:calc(12px*var(--fs));color:var(--sub)}
+.bcard #fzRange{width:100%;margin:6px 0 2px;accent-color:var(--accent)}
+.bcard .fzv{font-size:calc(12px*var(--fs));font-weight:600}
+.bcard .fzd{margin-top:6px;font-size:calc(12px*var(--fs))}
+.bcard .fzd summary{color:var(--sub);cursor:pointer}
 .bcard .fzmsg{font-size:calc(11.5px*var(--fs));color:var(--accent)}
 .bcard .cx{position:absolute;top:4px;right:6px;border:0;background:none;color:var(--sub);font-size:calc(18px*var(--fs));cursor:pointer;padding:2px 5px;line-height:1}
 .grip.cg{width:calc(13px*var(--fs));height:calc(13px*var(--fs));padding:0;border-radius:50%;background:var(--c);flex:none;display:inline-block;box-shadow:0 0 0 1.5px var(--panel),0 0 0 2.5px color-mix(in srgb,var(--ink) 25%,transparent);cursor:pointer;margin:0 3px}
@@ -342,7 +347,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.30</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.31</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
 <div class="wrap">
 
   <div class="panel">
@@ -503,7 +508,7 @@ textarea{width:100%;min-height:80px}
   <section id="h-see"><h3>見る</h3>
     <ul>
       <li><b>なぞる</b>：グラフの上でマウスを動かす（指でさわる）と、その年と、その年に各人が何歳だったかが出る。</li>
-      <li><b>自分でぼかす</b>：帯を押してカードの「始まりをぼかす」「終わりをぼかす」（人なら生年・没年）を押すと、「前1000〜前300」のようにはばを書いて、そのはしをぼかせる。元のデータは変えずに上書きするだけで、「ぼかしをやめる」でもどる。</li>
+      <li><b>自分でぼかす</b>：帯を押してカードの「始まりをぼかす」「終わりをぼかす」（人なら生年・没年）を押すと、つまみ（スライダー）か「少し・ふつう・大きく」でぼかしのはばを決められる。動かすと帯がその場でぼける。「くわしく」を開くと「前1000〜前300」のように年で書くこともできる。元のデータは変えずに上書きするだけで、「ぼかしをやめる」でもどる。</li>
       <li><b>カード</b>：帯を押すと、そばにカードが出て、生没年・かんたんなプロフィール・諸説のメモと、Wikipedia・Wikidataへのリンクが出る。外を押すか × でとじる。</li>
       <li><b>重なりを調べる</b>：帯を2本クリックすると、同時に生きてた期間（重なってた期間）が出る。もう一度押すと選ぶのをやめる。</li>
       <li><b>拡大・縮小</b>：「−」「＋」「全体」ボタン、ctrl＋ほいーる、すまほは2本指。</li>
@@ -1029,7 +1034,10 @@ function renderDur(chart){
     const right = cut ? ax(capOf(r)) : Math.max(a1, am??a1);
     const w = Math.max(right-left, 1e-9), pc = v => ((v-left)/w*100).toFixed(2)+'%';
     const st=[`${c} 0%`];
-    if(cut){ st.push(`${c} 100%`); }
+    const EASE=[[0,0],[.15,.04],[.3,.13],[.45,.28],[.6,.47],[.75,.68],[.88,.86],[1,1]];
+    const fade=(f,t)=>EASE.map(([u,e])=>`${col(r.id, Math.max(0.001,1-e))} ${(f+(t-f)*u).toFixed(2)}%`);   // 濃い→地の色まで
+    if(cut){ if(r.hi>r.lo || (am!=null && am>a1)) st.push(`${c} 86%`, ...fade(86,100)); else st.push(`${c} 100%`); }
+    else if(a1>a0 && !(am!=null && am>a1)){ st.push(`${c} ${pc(a0)}`, ...fade(parseFloat(pc(a0)), parseFloat(pc(a1)))); }
     else if(a1>a0){ st.push(`${c} ${pc(a0)}`, `${col(r.id,.55)} ${pc(a1)}`); } else st.push(`${c} ${pc(a1)}`);
     if(!cut && am!=null && am>a1){ st.push(`${col(r.id,.28)} ${pc(a1)}`, `${col(r.id,.2)} ${pc(am-(am-a1)*0.15)}`, `${col(r.id,0.001)} 100%`); }
     const tip = [r.n+' '+r.txt, r.note, r.src?('出典：'+r.src):''].filter(Boolean).join('\n');
@@ -2228,18 +2236,44 @@ function fzButtons(id, p){
   const lb = k => per ? (k==='b'?'始まり':'終わり') : (k==='b'?'生年':'没年');
   const btn = k => f[k] ? `<button class="cbtn on" data-fz="${k}" data-off="1">${lb(k)}のぼかしをやめる</button>`
                         : `<button class="cbtn" data-fz="${k}">${k==='b'?'〜 ':''}${lb(k)}をぼかす${k==='d'?' 〜':''}</button>`;
-  return `<div class="fzrow">${btn('b')}${btn('d')}</div><div class="fzin" id="fzIn" hidden></div>`;
+  const durNote = SET.mode==='dur' && f.b ? `<div class="fzh">長さくらべはスタートを0にそろえてるので、始まりのゆれも先っぽのぼかしにまとめて出してる（年表にすると始まりにも出る）</div>` : '';
+  return `<div class="fzrow">${btn('b')}${btn('d')}</div>${durNote}<div class="fzin" id="fzIn" hidden></div>`;
 }
 function fzOpen(id, k){
   const p=PEOPLE[id], box=$('#fzIn'); if(!p||!box) return;
   const per=isPeriod(p), lb = per ? (k==='b'?'始まり':'終わり') : (k==='b'?'生年':'没年');
   const base = p._o ? {...p, ...p._o} : p;
-  box.hidden=false; box.dataset.k=k;
-  box.innerHTML = `<label>${lb}をどこからどこまで？<input type="text" id="fzText" value="${esc(fzSuggest(base,k))}"></label>
-    <div class="fzh">例：前1000〜前300 ／ 前10世紀〜前4世紀 ／ 前14000頃 ／ 1350〜1360</div>
-    <div class="fzb"><button class="cbtn" data-fzok="1">決定</button><button class="cbtn" data-fzcancel="1">やめる</button><span class="fzmsg" id="fzMsg"></span></div>`;
-  const t=$('#fzText'); t.focus(); t.select();
+  const y = k==='b' ? (base.bm??base.b) : (base.dm??base.d??CUR);
+  const L = Math.max(1, (base.dm??base.d??CUR) - (base.bm??base.b));
+  const nice = v => v>=200 ? Math.round(v/50)*50 : v>=40 ? Math.round(v/10)*10 : Math.max(1, Math.round(v));
+  const lv = {s:nice(Math.max(2, L*0.02)), m:nice(Math.max(4, L*0.05)), l:nice(Math.max(8, L*0.10))};
+  const W = Math.max(lv.l*2, 10), step = W>=2000 ? 50 : W>=400 ? 10 : 1;
+  box._prev = FZ[id] ? {...FZ[id]} : null;
+  box.hidden=false; box.dataset.k=k; box.dataset.y=y;
+  box.innerHTML = `<div class="fzt">${lb}を、どのくらいぼかす？（動かすと帯がその場でぼける）</div>
+    <input type="range" id="fzRange" min="0" max="${W}" step="${step}" value="${lv.m}">
+    <div class="fzv" id="fzVal"></div>
+    <div class="fzb"><button class="cbtn" data-fzlv="${lv.s}">少し</button><button class="cbtn" data-fzlv="${lv.m}">ふつう</button><button class="cbtn" data-fzlv="${lv.l}">大きく</button></div>
+    <details class="fzd"><summary>くわしく（年で書く）</summary>
+      <input type="text" id="fzText">
+      <div class="fzh">例：前1000〜前300 ／ 前10世紀〜前4世紀 ／ 前14000頃 ／ 1350〜1360（前とうしろでちがうはばにもできる）</div></details>
+    <div class="fzb"><button class="cbtn on" data-fzok="1">決定</button><button class="cbtn" data-fzcancel="1">やめる</button><span class="fzmsg" id="fzMsg"></span></div>`;
+  const t=$('#fzText'), rg=$('#fzRange');
+  const setW = w => { w=+w; rg.value=w; t.value = `${fmtY(y-w)}〜${fmtY(y+w)}`; $('#fzVal').textContent = `${t.value}（前後に ${nf(w)}年）`; fzPreview(id, k, t.value); };
+  rg.addEventListener('input', ()=>setW(rg.value));
+  box.querySelectorAll('[data-fzlv]').forEach(b=>b.addEventListener('click', ev=>{ ev.stopPropagation(); setW(b.dataset.fzlv); }));
+  t.addEventListener('input', ()=>{ $('#fzVal').textContent=t.value; fzPreview(id, k, t.value); });
   t.addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); fzCommit(id); } ev.stopPropagation(); });
+  setW(lv.m);
+}
+// 動かしてるあいだの見本（決定するまでは仮）
+function fzPreview(id, k, text){
+  const r=parseRange(text); if(!r || r[1]<=r[0]) return;
+  FZ[id]={...(FZ[id]||{}), [k]:text}; scheduleRender();
+}
+function fzCancel(id){
+  const box=$('#fzIn'); if(box._prev) FZ[id]=box._prev; else delete FZ[id];
+  applyFZ(id); box.hidden=true; render();
 }
 function fzCommit(id){
   const box=$('#fzIn'), k=box.dataset.k, t=$('#fzText').value.trim();
@@ -2260,7 +2294,7 @@ $('#bcard').addEventListener('click', ev=>{ if(ev.target.closest('.cx')) hideCar
   const id=$('#bcard').dataset.id, z=ev.target.closest('[data-fz]');
   if(z){ if(z.dataset.off) fzOff(id, z.dataset.fz); else fzOpen(id, z.dataset.fz); return; }
   if(ev.target.closest('[data-fzok]')) fzCommit(id);
-  if(ev.target.closest('[data-fzcancel]')){ $('#fzIn').hidden=true; } });
+  if(ev.target.closest('[data-fzcancel]')) fzCancel(id); });
 document.addEventListener('click', ev=>{ if(!ev.target.isConnected) return; if(!ev.target.closest('#bcard,[data-sel],#chart .dh,#chart .row')) hideCard(); });
 window.addEventListener('scroll', hideCard, {passive:true});
 document.addEventListener('keydown', ev=>{ if(ev.key==='Escape' && !(document.activeElement && document.activeElement.id==='fzText')) hideCard(); });
