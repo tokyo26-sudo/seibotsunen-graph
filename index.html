@@ -166,7 +166,7 @@ textarea{width:100%;min-height:80px}
 .bcard .ratio{margin-top:6px;display:flex;flex-wrap:wrap;gap:2px 10px;font-size:calc(12px*var(--fs))}
 .bcard .ratio b{font-weight:600}
 .bcard .cbtn{font-size:calc(12px*var(--fs));padding:3px 10px}
-.bar .brk{position:absolute;top:0;bottom:0;left:62%;width:14px;margin-left:-7px;background:var(--panel);cursor:pointer;
+.bar .brk{position:absolute;top:0;bottom:0;left:80%;width:14px;margin-left:-7px;background:var(--panel);cursor:pointer;
   clip-path:polygon(0% 0%,55% 0%,100% 20%,55% 40%,100% 60%,55% 80%,100% 100%,45% 100%,0% 80%,45% 60%,0% 40%,45% 20%)}
 .bar.cutbar .lb{z-index:1}
 .bcard .cx{position:absolute;top:4px;right:6px;border:0;background:none;color:var(--sub);font-size:calc(18px*var(--fs));cursor:pointer;padding:2px 5px;line-height:1}
@@ -334,7 +334,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.28</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.29</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
 <div class="wrap">
 
   <div class="panel">
@@ -532,7 +532,7 @@ textarea{width:100%;min-height:80px}
     <p>「📏」ボタンで切りかえ。年表とちがって、どの帯も0から始まり、長さだけをくらべる。</p>
     <ul>
       <li>並べている人は<b>享年</b>で、期間（縄文時代・江戸時代など）は<b>何年続いたか</b>で出る。始まり・終わりに諸説があると、帯のはしがぼける。</li>
-      <li><b>途中を省略（〰）</b>：帯を押してカードの「〰 途中を省略する」を押すと、その帯だけ途中をちょん切って、ほかの帯が見やすい目盛りになる。〰を押すと本当の長さにもどる。</li>
+      <li><b>途中を省略（〰）</b>：見たい大きさまで拡大してから、帯を押してカードの「〰 途中を省略する」を押すと、その大きさのままその帯だけ途中をちょん切る（拡大してないときは2番目に長い帯より少し長いところで切る）。〰を押すと本当の長さにもどる。</li>
       <li><b>倍率</b>：帯を押すとカードに「江戸時代の約51倍」のように、ほかの帯とくらべた倍率が出る。</li>
       <li><b>1年＝1px（実寸）</b>：単位でこれを選ぶと1年が1ピクセル。縄文時代なら横に13600ピクセル。スクロールして長さを体で感じられる。</li>
       <li>プリセット「生き物の寿命」「放射性物質の半減期」がある。生き物は、濃い帯がふつうの寿命、うすく伸びた先が最長記録。</li>
@@ -938,7 +938,7 @@ function addDurSet(si){
   render(); syncURL();
 }
 // 並べるもの：長さくらべのもの＋人（享年）
-let BRK = new Set();   // 〰で途中を省略する帯（自分で指定したものだけ）
+let BRK = new Map();   // 〰で途中を省略する帯 → どこで切るか（秒）。押したときに見てた大きさで切る
 function durRows(){
   const rows=[];
   for(const id of list){ const p=PEOPLE[id]; if(!p) continue;
@@ -985,7 +985,10 @@ function renderDur(chart){
   const isLog = SET.dunit==='log', isPx = SET.dunit==='px';
   const ext = r => r.mx||r.hi;
   const nb = rows.filter(r=>!BRK.has(r.id));
-  const maxSec = Math.max(...(nb.length?nb:rows).map(ext));     // 省略した帯は目盛りの長さに入れない
+  const second = nb.length ? Math.max(...nb.map(ext)) : 0;
+  const capOf = r => { const c=BRK.get(r.id); return c>0 ? c : Math.max(second*1.3, 1); };   // 古い共有URLなどで位置がないとき
+  // 目盛りの長さ：省略してない帯と、省略した帯の「切ったところ」まで
+  const maxSec = Math.max(...nb.map(ext), ...rows.filter(r=>BRK.has(r.id)).map(r=>Math.min(ext(r), capOf(r))));
   const minSec = Math.min(...rows.map(r=>r.lo).filter(x=>x>0));
   const unitK = isLog ? null : isPx ? 'y' : (SET.dunit==='auto'||!DUNITS[SET.dunit] ? autoUnit(maxSec) : SET.dunit);
   const U = unitK ? DUNITS[unitK][0] : 1;
@@ -1009,12 +1012,12 @@ function renderDur(chart){
   const grid = ticks.map(([v])=>`<div class="gridl" style="left:${P(v)}"></div>`).join('');
   const handle = r => `${gripHTML(r.id,true)}<button class="x" title="消す" data-rm="${r.id}">×</button>`;
   const left = isLog ? min : 0;
-  const isCut = r => BRK.has(r.id) && ax(ext(r)) > max;            // 目盛りからはみ出すものだけ〰で切る
+  const isCut = r => BRK.has(r.id) && ext(r) > capOf(r)*1.0001;      // 切ったところより長いものだけ〰
   const rowsH = rows.map(r=>{
     const c=col(r.id);
     const cut = isCut(r);
     const a0=ax(r.lo), a1=ax(r.hi), am=r.mx?ax(r.mx):null;
-    const right = cut ? max : Math.max(a1, am??a1);
+    const right = cut ? ax(capOf(r)) : Math.max(a1, am??a1);
     const w = Math.max(right-left, 1e-9), pc = v => ((v-left)/w*100).toFixed(2)+'%';
     const st=[`${c} 0%`];
     if(cut){ st.push(`${c} 100%`); }
@@ -1023,7 +1026,7 @@ function renderDur(chart){
     const tip = [r.n+' '+r.txt, r.note, r.src?('出典：'+r.src):''].filter(Boolean).join('\n');
     return `<div class="row" data-id="${r.id}">
       <div class="name dh" data-id="${r.id}">${handle(r)}<span class="nm" title="${esc(r.n)}">${esc(r.n)}</span>${r.person?'<span class="tag">享年</span>':r.period?'<span class="tag">期間</span>':''}</div>
-      <div class="track"><div class="bar dead${!cut&&am!=null&&am>a1?' fd':''}${cut?' cutbar':''}" style="left:${P(left)};width:${S(left,right)};background:linear-gradient(90deg, ${st.join(', ')})" title="${esc(tip)}"><span class="lb" style="left:0%"><b>${esc(r.n)}</b>${esc(r.txt)}${cut?'（途中省略）':''}</span>${cut?'<span class="brk" title="押すと省略をやめる"></span>':''}</div>
+      <div class="track"><div class="bar dead${!cut&&am!=null&&am>a1?' fd':''}${cut?' cutbar':''}${r.period?' period':''}" style="left:${P(left)};width:${S(left,right)};background:linear-gradient(90deg, ${st.join(', ')})" title="${esc(tip)}"><span class="lb" style="left:0%"><b>${esc(r.n)}</b>${esc(r.txt)}${cut?'（途中省略）':''}</span>${cut?'<span class="brk" title="押すと省略をやめる"></span>':''}</div>
       <span class="lbo"><b>${esc(r.n)}</b><span>${esc(r.txt)}${cut?'（途中省略）':''}</span></span></div></div>`;
   }).join('');
   chart.style.setProperty('--namew', NW+'px');
@@ -1035,7 +1038,7 @@ function renderDur(chart){
   const cutNote = rows.some(isCut) ? ' ／ 〰の帯は途中を省略してる（押すと本当の長さ）' : '';
   $('#info').innerHTML = isPx ? `1年＝1ピクセル（実寸）：横にスクロールして長さを体で感じてネ${cutNote}` : (isLog ? '対数の目盛り：1秒・1分・1日・1年・100年…が同じ間かくで並ぶ ／ 濃い帯＝ふつうの寿命・半減期、うすく伸びた先＝最長記録'
                                : `目盛りの単位：${DUNITS[unitK][1]} ／ 濃い帯＝ふつうの寿命・半減期、うすく伸びた先＝最長記録 ／ 短すぎて見えないものは「対数」にすると見える`) + (isPx ? '' : cutNote);
-  return {min, max, LEN, NW, isLog, U, bars: rows.map(r=>({p:{id:r.id}, g:{left, right:Math.min(max, Math.max(ax(r.hi), r.mx?ax(r.mx):ax(r.hi)))}}))};
+  return {min, max, LEN, NW, isLog, U, bars: rows.map(r=>({p:{id:r.id}, g:{left, right: isCut(r) ? ax(capOf(r)) : Math.min(max, Math.max(ax(r.hi), r.mx?ax(r.mx):ax(r.hi)))}}))};
 }
 
 /* ---------- 色分け（まとまりごと／ひとりずつ／ひとつずつ自動） ----------
@@ -1531,7 +1534,8 @@ function packState(){
   if(DUR.length) o.D=DUR.map(d=>d.pk ? d.pk : ['h', d.n, d.lo, d.hi, d.mx, d.src||'', d.q||'']);
   if(E.length) o.E=E;
   packColors(o, list.slice(), DUR.map(d=>d.id));
-  const bk=[...BRK].map(id=>{ const i=list.indexOf(id); if(i>=0) return 'L'+i; const j=DUR.findIndex(d=>d.id===id); return j>=0?'D'+j:null; }).filter(Boolean);
+  const bk=[...BRK].map(([id,c])=>{ const i=list.indexOf(id), j=DUR.findIndex(d=>d.id===id); const k = i>=0 ? 'L'+i : j>=0 ? 'D'+j : null;
+    return k && (k + (c>0 ? ':'+(+c.toPrecision(4)) : '')); }).filter(Boolean);
   if(bk.length) o.bk=bk;
   const t=$('#title').value.trim(); if(t) o.t=t;
   const sel=selected.map(id=>list.indexOf(id)).filter(i=>i>=0); if(sel.length) o.s=sel;
@@ -1558,7 +1562,7 @@ async function unpackState(o){
     Dids.push(DUR.length>n0 ? DUR[DUR.length-1].id : null);
   }
   unpackColors(o, Lids, Dids);
-  BRK = new Set((o.bk||[]).map(k=> k[0]==='L' ? Lids[+k.slice(1)] : Dids[+k.slice(1)]).filter(Boolean));
+  BRK = new Map((o.bk||[]).map(k=>{ const [key,c]=String(k).split(':'); const id = key[0]==='L' ? Lids[+key.slice(1)] : Dids[+key.slice(1)]; return id ? [id, c?+c:null] : null; }).filter(Boolean));
   for(const x of o.E||[]){
     const id='E'+(manSeq++);
     if(Array.isArray(x) && x[0]==='e') events.push({id, n:x[1], y:x[2]});
@@ -2145,10 +2149,23 @@ function showCard(id, x, y){
   }
 }
 function toggleBreak(id){
-  if(BRK.has(id)) BRK.delete(id); else BRK.add(id);
-  render(); syncURL();
+  if(BRK.has(id)) BRK.delete(id);
+  else {
+    const rows=durRows(), me=rows.find(r=>r.id===id); if(!me) return;
+    const len=me.mx||me.hi, second=Math.max(0, ...rows.filter(r=>r.id!==id && !BRK.has(r.id)).map(r=>r.mx||r.hi));
+    let cap=null; const v=viewInfo(), g=geo && geo.dur;
+    if(v && g && v.vis < v.len*0.98){   // 拡大してるとき：画面の右はしの値（ちょっと内がわ）で切る
+      const ra = geo.min + Math.min(v.len, v.pos+v.vis)/v.len*(geo.max-geo.min);
+      cap = (g.isLog ? Math.pow(10, ra) : ra*g.U) * 0.85;
+    }
+    if(!cap || cap >= len*0.95) cap = second*1.3;        // 拡大してないとき：2番目より少し長いところで
+    cap = Math.max(cap, second*1.08);                       // ほかの帯より短くはしない
+    if(cap >= len*0.95){ toast('もう画面に入ってるので、切らなくても大丈夫'); return; }
+    BRK.set(id, cap);
+  }
+  ZOOM=1; render(); { const sc=document.querySelector('#chart .hscroll'); if(sc){ sc.scrollLeft=0; onScroll(); } } syncURL();
   const b=document.querySelector('#bcard [data-brk]'); if(b && b.dataset.brk===id) b.textContent = BRK.has(id) ? '省略をやめる' : '〰 途中を省略する';
-  toast(BRK.has(id) ? '〰 途中を省略した（目盛りからはみ出すぶんだけ）' : '省略をやめた（本当の長さ）');
+  toast(BRK.has(id) ? '〰 いま見てた大きさで途中を省略した' : '省略をやめた（本当の長さ）');
 }
 const fmtRatio = x => x>=10 ? Math.round(x).toLocaleString() : (Math.round(x*10)/10).toString();
 function ratioHTML(id){
@@ -2564,7 +2581,7 @@ $('#titleH').addEventListener('blur', ()=>syncTitle(true));
 $('#title').addEventListener('input', ()=>syncTitle(false));
 $('#title').addEventListener('input', ()=>{ clearTimeout($('#title')._t); $('#title')._t=setTimeout(syncURL,300); });
 $('#clear').addEventListener('click', ()=>{ runId++; list.filter(id=>/^M/.test(id)).forEach(id=>delete PEOPLE[id]);
-  list=[]; events=[]; DUR=[]; BRK=new Set(); selected=[]; colorIdx={}; nextColor=0; resetGroups(); ECOL={}; render(); syncURL(); });
+  list=[]; events=[]; DUR=[]; BRK=new Map(); selected=[]; colorIdx={}; nextColor=0; resetGroups(); ECOL={}; render(); syncURL(); });
 $('#share').addEventListener('click', async ()=>{
   await syncURL();
   try{ await navigator.clipboard.writeText(location.href); toast('URLコピーした！'); }catch(e){ prompt('このURLを共有',location.href); }
@@ -2654,7 +2671,7 @@ $('#loadFile').addEventListener('change', async ev=>{
     runId++;
     list.filter(id=>/^M/.test(id)).forEach(id=>delete PEOPLE[id]);
     for(const it of d.items||[]){ if(!it || !it.id) continue; PEOPLE[it.id]={...it}; const m=/^[ME](\d+)$/.exec(it.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; }
-    DUR=(d.dur||[]).map(x=>({...x})); BRK=new Set(d.brk||[]); DUR.forEach(x=>{ const m=/^D(\d+)$/.exec(x.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; });
+    DUR=(d.dur||[]).map(x=>({...x})); BRK=new Map((d.brk||[]).map(x=>Array.isArray(x)?x:[x,null])); DUR.forEach(x=>{ const m=/^D(\d+)$/.exec(x.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; });
     events=(d.events||[]).map(e=>({...e})); events.forEach(e=>{ const m=/^E(\d+)$/.exec(e.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; });
     list=(d.order||[]).filter(id=>PEOPLE[id]); selected=(d.selected||[]).filter(id=>list.includes(id));
     colorIdx={}; nextColor=0;
