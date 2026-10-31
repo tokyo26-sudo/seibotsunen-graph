@@ -163,6 +163,12 @@ textarea{width:100%;min-height:80px}
 .bcard .lk{margin-top:7px;display:flex;gap:12px;flex-wrap:wrap;font-size:calc(12.5px*var(--fs))}
 .bcard .lk a{color:var(--accent);text-decoration:none}
 .bcard .lk a:hover{text-decoration:underline}
+.bcard .ratio{margin-top:6px;display:flex;flex-wrap:wrap;gap:2px 10px;font-size:calc(12px*var(--fs))}
+.bcard .ratio b{font-weight:600}
+.bcard .cbtn{font-size:calc(12px*var(--fs));padding:3px 10px}
+.bar .brk{position:absolute;top:0;bottom:0;left:62%;width:14px;margin-left:-7px;background:var(--panel);cursor:pointer;
+  clip-path:polygon(0% 0%,55% 0%,100% 20%,55% 40%,100% 60%,55% 80%,100% 100%,45% 100%,0% 80%,45% 60%,0% 40%,45% 20%)}
+.bar.cutbar .lb{z-index:1}
 .bcard .cx{position:absolute;top:4px;right:6px;border:0;background:none;color:var(--sub);font-size:calc(18px*var(--fs));cursor:pointer;padding:2px 5px;line-height:1}
 .grip.cg{width:calc(13px*var(--fs));height:calc(13px*var(--fs));padding:0;border-radius:50%;background:var(--c);flex:none;display:inline-block;box-shadow:0 0 0 1.5px var(--panel),0 0 0 2.5px color-mix(in srgb,var(--ink) 25%,transparent);cursor:pointer;margin:0 3px}
 .grip.cg:hover{background:var(--c);transform:scale(1.18)}
@@ -328,7 +334,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.27</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.28</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
 <div class="wrap">
 
   <div class="panel">
@@ -338,7 +344,7 @@ textarea{width:100%;min-height:80px}
         <div class="dd" id="dd"></div>
       </div>
       <span class="seg" id="orient"><button data-o="h" class="on" title="横表示（時間が左→右）">↔️</button><button data-o="v" title="縦表示（時間が上→下）">↕️</button><button data-o="dur" title="長さくらべ（寿命・半減期など、長さだけを比べる）">📏</button></span>
-      <select id="dunit" title="目盛りの単位" style="display:none"><option value="auto">単位：自動</option><option value="s">秒</option><option value="min">分</option><option value="h">時間</option><option value="d">日</option><option value="y">年</option><option value="man">万年</option><option value="oku">億年</option><option value="log">対数</option></select>
+      <select id="dunit" title="目盛りの単位" style="display:none"><option value="auto">単位：自動</option><option value="s">秒</option><option value="min">分</option><option value="h">時間</option><option value="d">日</option><option value="y">年</option><option value="man">万年</option><option value="oku">億年</option><option value="log">対数</option><option value="px">1年＝1px（実寸）</option></select>
       <select id="dsort" title="並べ順" style="display:none"><option value="asc">短い順</option><option value="desc">長い順</option></select>
       <button class="tog" data-sec="add" aria-expanded="false">＋ 足す</button>
       <button class="tog" data-sec="set" aria-expanded="false">⚙ 設定</button>
@@ -525,7 +531,10 @@ textarea{width:100%;min-height:80px}
   <section id="h-dur"><h3>📏 長さくらべ</h3>
     <p>「📏」ボタンで切りかえ。年表とちがって、どの帯も0から始まり、長さだけをくらべる。</p>
     <ul>
-      <li>並べている人は<b>享年</b>で出る。</li>
+      <li>並べている人は<b>享年</b>で、期間（縄文時代・江戸時代など）は<b>何年続いたか</b>で出る。始まり・終わりに諸説があると、帯のはしがぼける。</li>
+      <li><b>途中を省略（〰）</b>：帯を押してカードの「〰 途中を省略する」を押すと、その帯だけ途中をちょん切って、ほかの帯が見やすい目盛りになる。〰を押すと本当の長さにもどる。</li>
+      <li><b>倍率</b>：帯を押すとカードに「江戸時代の約51倍」のように、ほかの帯とくらべた倍率が出る。</li>
+      <li><b>1年＝1px（実寸）</b>：単位でこれを選ぶと1年が1ピクセル。縄文時代なら横に13600ピクセル。スクロールして長さを体で感じられる。</li>
       <li>プリセット「生き物の寿命」「放射性物質の半減期」がある。生き物は、濃い帯がふつうの寿命、うすく伸びた先が最長記録。</li>
       <li>検索で同位体（例：セシウム137）を打つと、Wikidataの半減期を足せる。</li>
       <li><b>単位</b>：自動・秒〜億年・対数。短いものと長いものをまぜたら「対数」にすると全部見える。</li>
@@ -929,11 +938,23 @@ function addDurSet(si){
   render(); syncURL();
 }
 // 並べるもの：長さくらべのもの＋人（享年）
+let BRK = new Set();   // 〰で途中を省略する帯（自分で指定したものだけ）
 function durRows(){
   const rows=[];
-  for(const id of list){ const p=PEOPLE[id]; if(!p || isPeriod(p)) continue; const lf=life(p); if(lf==null || lf<0) continue;
-    rows.push({id, n:p.n, lo:lf*YS, hi:lf*YS, mx:null, txt:`享年 ${lifeFuzzy(p)?'約':''}${lf}年`, note:p.desc||'', person:1}); }
-  for(const d of DUR) rows.push(d);
+  for(const id of list){ const p=PEOPLE[id]; if(!p) continue;
+    if(isPeriod(p)){   // 期間：スタートをそろえて何年続いたか
+      const e = p.now ? CUR : p.d, e2 = p.now ? CUR : (p.d2??p.d);
+      const main = (p.now?CUR:(p.dm??p.d)) - (p.bm??p.b);
+      const lo = Math.max(0, e - (p.b2??p.b)), hi = Math.max(lo, e2 - p.b);
+      if(!(hi>0)) continue;
+      const fz = hi>lo;
+      rows.push({id, n:p.n, lo:lo*YS, hi:hi*YS, mid:Math.max(main,0)*YS, mx:null,
+        txt:`${fz?'約':''}${nf(main)}年間${p.now?'〜':''}${fz?`（${nf(lo)}〜${nf(hi)}年）`:''}`, note:periodNote(p), period:1});
+      continue;
+    }
+    const lf=life(p); if(lf==null || lf<0) continue;
+    rows.push({id, n:p.n, lo:lf*YS, hi:lf*YS, mid:lf*YS, mx:null, txt:`享年 ${lifeFuzzy(p)?'約':''}${lf}年`, note:p.desc||'', person:1}); }
+  for(const d of DUR) rows.push({...d, mid:(d.lo+d.hi)/2});
   rows.sort((a,b)=> SET.dsort==='desc' ? b.hi-a.hi : a.lo-b.lo);
   return rows;
 }
@@ -961,10 +982,12 @@ function renderDur(chart){
   }
   $('#zbar').hidden=false;
   lastColorIds=rows.map(r=>r.id); prepColors(lastColorIds); drawLegend(lastColorIds);
-  const isLog = SET.dunit==='log';
-  const maxSec = Math.max(...rows.map(r=>r.mx||r.hi));
+  const isLog = SET.dunit==='log', isPx = SET.dunit==='px';
+  const ext = r => r.mx||r.hi;
+  const nb = rows.filter(r=>!BRK.has(r.id));
+  const maxSec = Math.max(...(nb.length?nb:rows).map(ext));     // 省略した帯は目盛りの長さに入れない
   const minSec = Math.min(...rows.map(r=>r.lo).filter(x=>x>0));
-  const unitK = isLog ? null : (SET.dunit==='auto'||!DUNITS[SET.dunit] ? autoUnit(maxSec) : SET.dunit);
+  const unitK = isLog ? null : isPx ? 'y' : (SET.dunit==='auto'||!DUNITS[SET.dunit] ? autoUnit(maxSec) : SET.dunit);
   const U = unitK ? DUNITS[unitK][0] : 1;
   const ax = sec => isLog ? Math.log10(Math.max(sec, 1e-12)) : sec/U;
   let min, max;
@@ -973,9 +996,9 @@ function renderDur(chart){
   const narrow = window.innerWidth<=640;
   const NW = Math.round((UI.names ? (narrow?96:150) : 24) * (SET.fs||1));
   const baseLen = Math.max(200, chart.clientWidth - NW - 10);
-  const maxZ = isLog ? 60 : Math.max(1, (max-min)/ (minSec/U) / 4);
+  const maxZ = isPx ? 1 : isLog ? 60 : Math.max(1, (max-min)/ (minSec/U) / 4);
   ZOOM = Math.max(1, Math.min(ZMAX, maxZ, ZOOM));
-  const LEN = Math.round(baseLen*ZOOM);
+  const LEN = isPx ? Math.max(200, Math.round(max-min)) : Math.round(baseLen*ZOOM);   // 実寸：1年＝1ピクセル
   const P = v => ((v-min)/(max-min)*100).toFixed(3)+'%';
   const S = (a,b) => ((b-a)/(max-min)*100).toFixed(3)+'%';
   // 目盛り
@@ -986,19 +1009,22 @@ function renderDur(chart){
   const grid = ticks.map(([v])=>`<div class="gridl" style="left:${P(v)}"></div>`).join('');
   const handle = r => `${gripHTML(r.id,true)}<button class="x" title="消す" data-rm="${r.id}">×</button>`;
   const left = isLog ? min : 0;
+  const isCut = r => BRK.has(r.id) && ax(ext(r)) > max;            // 目盛りからはみ出すものだけ〰で切る
   const rowsH = rows.map(r=>{
     const c=col(r.id);
+    const cut = isCut(r);
     const a0=ax(r.lo), a1=ax(r.hi), am=r.mx?ax(r.mx):null;
-    const right = Math.max(a1, am??a1);
+    const right = cut ? max : Math.max(a1, am??a1);
     const w = Math.max(right-left, 1e-9), pc = v => ((v-left)/w*100).toFixed(2)+'%';
     const st=[`${c} 0%`];
-    if(a1>a0){ st.push(`${c} ${pc(a0)}`, `${col(r.id,.55)} ${pc(a1)}`); } else st.push(`${c} ${pc(a1)}`);
-    if(am!=null && am>a1){ st.push(`${col(r.id,.28)} ${pc(a1)}`, `${col(r.id,.2)} ${pc(am-(am-a1)*0.15)}`, `${col(r.id,0.001)} 100%`); }
+    if(cut){ st.push(`${c} 100%`); }
+    else if(a1>a0){ st.push(`${c} ${pc(a0)}`, `${col(r.id,.55)} ${pc(a1)}`); } else st.push(`${c} ${pc(a1)}`);
+    if(!cut && am!=null && am>a1){ st.push(`${col(r.id,.28)} ${pc(a1)}`, `${col(r.id,.2)} ${pc(am-(am-a1)*0.15)}`, `${col(r.id,0.001)} 100%`); }
     const tip = [r.n+' '+r.txt, r.note, r.src?('出典：'+r.src):''].filter(Boolean).join('\n');
     return `<div class="row" data-id="${r.id}">
-      <div class="name dh" data-id="${r.id}">${handle(r)}<span class="nm" title="${esc(r.n)}">${esc(r.n)}</span>${r.person?'<span class="tag">享年</span>':''}</div>
-      <div class="track"><div class="bar dead${am!=null&&am>a1?' fd':''}" style="left:${P(left)};width:${S(left,right)};background:linear-gradient(90deg, ${st.join(', ')})" title="${esc(tip)}"><span class="lb" style="left:0%"><b>${esc(r.n)}</b>${esc(r.txt)}</span></div>
-      <span class="lbo"><b>${esc(r.n)}</b><span>${esc(r.txt)}</span></span></div></div>`;
+      <div class="name dh" data-id="${r.id}">${handle(r)}<span class="nm" title="${esc(r.n)}">${esc(r.n)}</span>${r.person?'<span class="tag">享年</span>':r.period?'<span class="tag">期間</span>':''}</div>
+      <div class="track"><div class="bar dead${!cut&&am!=null&&am>a1?' fd':''}${cut?' cutbar':''}" style="left:${P(left)};width:${S(left,right)};background:linear-gradient(90deg, ${st.join(', ')})" title="${esc(tip)}"><span class="lb" style="left:0%"><b>${esc(r.n)}</b>${esc(r.txt)}${cut?'（途中省略）':''}</span>${cut?'<span class="brk" title="押すと省略をやめる"></span>':''}</div>
+      <span class="lbo"><b>${esc(r.n)}</b><span>${esc(r.txt)}${cut?'（途中省略）':''}</span></span></div></div>`;
   }).join('');
   chart.style.setProperty('--namew', NW+'px');
   chart.innerHTML = `<div class="hscroll"><div class="hinner" style="width:${NW+LEN+10}px">
@@ -1006,9 +1032,10 @@ function renderDur(chart){
       <div class="arow tk" id="tkrow">${tickLbl}<div class="cyear" id="cyear"></div></div>
     </div></div>
     <div class="body" id="cbody"><div class="bg">${grid}<div class="cline" id="cline"></div></div>${rowsH}</div></div></div>`;
-  $('#info').innerHTML = isLog ? '対数の目盛り：1秒・1分・1日・1年・100年…が同じ間かくで並ぶ ／ 濃い帯＝ふつうの寿命・半減期、うすく伸びた先＝最長記録'
-                               : `目盛りの単位：${DUNITS[unitK][1]} ／ 濃い帯＝ふつうの寿命・半減期、うすく伸びた先＝最長記録 ／ 短すぎて見えないものは「対数」にすると見える`;
-  return {min, max, LEN, NW, isLog, U, bars: rows.map(r=>({p:{id:r.id}, g:{left, right:Math.max(ax(r.hi), r.mx?ax(r.mx):ax(r.hi))}}))};
+  const cutNote = rows.some(isCut) ? ' ／ 〰の帯は途中を省略してる（押すと本当の長さ）' : '';
+  $('#info').innerHTML = isPx ? `1年＝1ピクセル（実寸）：横にスクロールして長さを体で感じてネ${cutNote}` : (isLog ? '対数の目盛り：1秒・1分・1日・1年・100年…が同じ間かくで並ぶ ／ 濃い帯＝ふつうの寿命・半減期、うすく伸びた先＝最長記録'
+                               : `目盛りの単位：${DUNITS[unitK][1]} ／ 濃い帯＝ふつうの寿命・半減期、うすく伸びた先＝最長記録 ／ 短すぎて見えないものは「対数」にすると見える`) + (isPx ? '' : cutNote);
+  return {min, max, LEN, NW, isLog, U, bars: rows.map(r=>({p:{id:r.id}, g:{left, right:Math.min(max, Math.max(ax(r.hi), r.mx?ax(r.mx):ax(r.hi)))}}))};
 }
 
 /* ---------- 色分け（まとまりごと／ひとりずつ／ひとつずつ自動） ----------
@@ -1471,7 +1498,7 @@ function readViewCode(v){
   if(lg==='1'||lg==='0') SET.legend = lg==='1';
   if(cm) SET.cmode = {g:'group',e:'each',n:'name'}[cm] || SET.cmode;
   if(md==='d') SET.mode='dur'; else if(md==='t') SET.mode='time';
-  if(['auto','s','min','h','d','y','man','oku','log'].includes(du)) SET.dunit=du;
+  if(['auto','s','min','h','d','y','man','oku','log','px'].includes(du)) SET.dunit=du;
   if(ds==='asc'||ds==='desc') SET.dsort=ds;
   if(['sys','ud','min','maru','hand'].includes(fo)) SET.font=fo;
   if(['0.85','1','1.25','1.6'].includes(fz)) SET.fs=+fz;
@@ -1504,6 +1531,8 @@ function packState(){
   if(DUR.length) o.D=DUR.map(d=>d.pk ? d.pk : ['h', d.n, d.lo, d.hi, d.mx, d.src||'', d.q||'']);
   if(E.length) o.E=E;
   packColors(o, list.slice(), DUR.map(d=>d.id));
+  const bk=[...BRK].map(id=>{ const i=list.indexOf(id); if(i>=0) return 'L'+i; const j=DUR.findIndex(d=>d.id===id); return j>=0?'D'+j:null; }).filter(Boolean);
+  if(bk.length) o.bk=bk;
   const t=$('#title').value.trim(); if(t) o.t=t;
   const sel=selected.map(id=>list.indexOf(id)).filter(i=>i>=0); if(sel.length) o.s=sel;
   if(ZOOM>1.01){ const vi=viewInfo(); if(vi){ o.z=+ZOOM.toFixed(2); o.c=Math.round(vi.center); } }
@@ -1529,6 +1558,7 @@ async function unpackState(o){
     Dids.push(DUR.length>n0 ? DUR[DUR.length-1].id : null);
   }
   unpackColors(o, Lids, Dids);
+  BRK = new Set((o.bk||[]).map(k=> k[0]==='L' ? Lids[+k.slice(1)] : Dids[+k.slice(1)]).filter(Boolean));
   for(const x of o.E||[]){
     const id='E'+(manSeq++);
     if(Array.isArray(x) && x[0]==='e') events.push({id, n:x[1], y:x[2]});
@@ -2094,7 +2124,9 @@ function showCard(id, x, y){
     <div class="t"><i style="background:${col(id)}"></i>${esc(name)}</div>
     ${yrs?`<div class="y">${esc(yrs)}</div>`:''}${descHTML}
     ${note?`<div class="nt">${esc(note)}</div>`:''}${src?`<div class="nt">出典：${esc(src)}</div>`:''}
-    ${qid?`<div class="lk" id="bcLinks">${cardLinks(qid, LINKS[qid])}</div>`:''}`;
+    ${SET.mode==='dur'?ratioHTML(id):''}
+    ${qid?`<div class="lk" id="bcLinks">${cardLinks(qid, LINKS[qid])}</div>`:''}
+    ${SET.mode==='dur'?`<div class="lk"><button class="cbtn" data-brk="${id}">${BRK.has(id)?'省略をやめる':'〰 途中を省略する'}</button></div>`:''}`;
   card.style.display='block';
   const cw=card.offsetWidth, ch=card.offsetHeight;
   // 押した場所の横に出す（上下の帯はそのまま押せるように）
@@ -2112,8 +2144,23 @@ function showCard(id, x, y){
     }).catch(()=>{ const dd=$('#bcDesc'); if(dd && !desc && card.dataset.id===id) dd.textContent='説明なし（Wikidataにつながらない）'; });
   }
 }
+function toggleBreak(id){
+  if(BRK.has(id)) BRK.delete(id); else BRK.add(id);
+  render(); syncURL();
+  const b=document.querySelector('#bcard [data-brk]'); if(b && b.dataset.brk===id) b.textContent = BRK.has(id) ? '省略をやめる' : '〰 途中を省略する';
+  toast(BRK.has(id) ? '〰 途中を省略した（目盛りからはみ出すぶんだけ）' : '省略をやめた（本当の長さ）');
+}
+const fmtRatio = x => x>=10 ? Math.round(x).toLocaleString() : (Math.round(x*10)/10).toString();
+function ratioHTML(id){
+  const rows=durRows(), me=rows.find(r=>r.id===id); if(!me || !(me.mid>0)) return '';
+  const others=rows.filter(r=>r.id!==id && r.mid>0).sort((a,b)=>b.mid-a.mid).slice(0,8);
+  if(!others.length) return '';
+  return `<div class="ratio">${others.map(o=>{ const x=me.mid/o.mid;
+    const t = x>=1.05 ? `約${fmtRatio(x)}倍` : x<=0.95 ? `約${fmtRatio(1/x)}分の1` : 'ほぼ同じ';
+    return `<span><b>${esc(o.n)}</b>の${t}</span>`; }).join('')}</div>`;
+}
 function hideCard(){ $('#bcard').style.display='none'; $('#bcard').dataset.id=''; }
-$('#bcard').addEventListener('click', ev=>{ if(ev.target.closest('.cx')) hideCard(); });
+$('#bcard').addEventListener('click', ev=>{ if(ev.target.closest('.cx')) hideCard(); const b=ev.target.closest('[data-brk]'); if(b) toggleBreak(b.dataset.brk); });
 document.addEventListener('click', ev=>{ if(!ev.target.isConnected) return; if(!ev.target.closest('#bcard,[data-sel],#chart .dh,#chart .row')) hideCard(); });
 window.addEventListener('scroll', hideCard, {passive:true});
 document.addEventListener('keydown', ev=>{ if(ev.key==='Escape') hideCard(); });
@@ -2143,6 +2190,7 @@ $('#chart').addEventListener('click', ev=>{
   if(editing()) return;
   if(SET.mode==='dur'){   // 長さくらべ：カードだけ
     const r = ev.target.closest('.row[data-id]'); if(!r) return;
+    if(ev.target.closest('.brk')){ toggleBreak(r.dataset.id); return; }
     if($('#bcard').dataset.id===r.dataset.id){ hideCard(); return; }
     showCard(r.dataset.id, ev.clientX, ev.clientY); return;
   }
@@ -2488,7 +2536,8 @@ function applySet(){
 $('#orient').addEventListener('click', ev=>{ const b=ev.target.closest('[data-o]'); if(!b) return;
   const o=b.dataset.o, was=SET.mode; if(o==='dur') SET.mode='dur'; else { SET.mode='time'; SET.orient=o; }
   if(was!==SET.mode) ZOOM=1; applySet(); render(); });
-$('#dunit').addEventListener('change', ()=>{ SET.dunit=$('#dunit').value; ZOOM=1; applySet(); render(); });
+$('#dunit').addEventListener('change', ()=>{ SET.dunit=$('#dunit').value; ZOOM=1; applySet(); render();
+  const sc=document.querySelector('#chart .hscroll'); if(sc){ sc.scrollLeft=0; onScroll(); } });   // 単位を変えたら左はしから
 $('#dsort').addEventListener('change', ()=>{ SET.dsort=$('#dsort').value; applySet(); render(); });
 $('#gtick').addEventListener('change', ()=>{ SET.gtick=$('#gtick').checked; applySet(); render(); });
 $('#gband').addEventListener('change', ()=>{ SET.gband=$('#gband').checked; applySet(); render(); });
@@ -2515,7 +2564,7 @@ $('#titleH').addEventListener('blur', ()=>syncTitle(true));
 $('#title').addEventListener('input', ()=>syncTitle(false));
 $('#title').addEventListener('input', ()=>{ clearTimeout($('#title')._t); $('#title')._t=setTimeout(syncURL,300); });
 $('#clear').addEventListener('click', ()=>{ runId++; list.filter(id=>/^M/.test(id)).forEach(id=>delete PEOPLE[id]);
-  list=[]; events=[]; DUR=[]; selected=[]; colorIdx={}; nextColor=0; resetGroups(); ECOL={}; render(); syncURL(); });
+  list=[]; events=[]; DUR=[]; BRK=new Set(); selected=[]; colorIdx={}; nextColor=0; resetGroups(); ECOL={}; render(); syncURL(); });
 $('#share').addEventListener('click', async ()=>{
   await syncURL();
   try{ await navigator.clipboard.writeText(location.href); toast('URLコピーした！'); }catch(e){ prompt('このURLを共有',location.href); }
@@ -2583,7 +2632,7 @@ $('#shotCopyV').addEventListener('click', async ()=>{
 function snapshot(){
   const item = id => { const p=PEOPLE[id]; if(!p) return null; if(isPeriod(p)) return {...p}; const o=pickFields(p); if(p.type) o.type=p.type; return o; };
   return {app:'seibotsunen-graph', version:1, saved:new Date().toISOString(),
-    title:$('#title').value.trim(), order:list.slice(), items:list.map(item).filter(Boolean), events:events.map(e=>({...e})), dur:DUR.map(d=>({...d})),
+    title:$('#title').value.trim(), order:list.slice(), items:list.map(item).filter(Boolean), events:events.map(e=>({...e})), dur:DUR.map(d=>({...d})), brk:[...BRK],
     colors:{groups:GROUPS.map(G=>({...G})), grp:Object.fromEntries(Object.entries(GRP).filter(([id])=>list.includes(id)||DUR.some(d=>d.id===id))), ecol:{...ECOL}, active:ACTIVE, gseq:GSEQ},
     selected:selected.slice(), settings:{...SET, sort:$('#sort').value, era:$('#era').value}};
 }
@@ -2605,7 +2654,7 @@ $('#loadFile').addEventListener('change', async ev=>{
     runId++;
     list.filter(id=>/^M/.test(id)).forEach(id=>delete PEOPLE[id]);
     for(const it of d.items||[]){ if(!it || !it.id) continue; PEOPLE[it.id]={...it}; const m=/^[ME](\d+)$/.exec(it.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; }
-    DUR=(d.dur||[]).map(x=>({...x})); DUR.forEach(x=>{ const m=/^D(\d+)$/.exec(x.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; });
+    DUR=(d.dur||[]).map(x=>({...x})); BRK=new Set(d.brk||[]); DUR.forEach(x=>{ const m=/^D(\d+)$/.exec(x.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; });
     events=(d.events||[]).map(e=>({...e})); events.forEach(e=>{ const m=/^E(\d+)$/.exec(e.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; });
     list=(d.order||[]).filter(id=>PEOPLE[id]); selected=(d.selected||[]).filter(id=>list.includes(id));
     colorIdx={}; nextColor=0;
