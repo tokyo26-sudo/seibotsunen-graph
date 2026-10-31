@@ -169,6 +169,14 @@ textarea{width:100%;min-height:80px}
 .bar .brk{position:absolute;top:0;bottom:0;left:80%;width:14px;margin-left:-7px;background:var(--panel);cursor:pointer;
   clip-path:polygon(0% 0%,55% 0%,100% 20%,55% 40%,100% 60%,55% 80%,100% 100%,45% 100%,0% 80%,45% 60%,0% 40%,45% 20%)}
 .bar.cutbar .lb{z-index:1}
+.bcard .fzrow{margin-top:7px;display:flex;gap:6px;flex-wrap:wrap}
+.bcard .cbtn.on{border-color:var(--accent);color:var(--accent)}
+.bcard .fzin{margin-top:7px;padding:7px 8px;border:1px dashed var(--line);border-radius:8px}
+.bcard .fzin label{display:block;font-size:calc(12px*var(--fs));color:var(--sub)}
+.bcard .fzin input{width:100%;box-sizing:border-box;margin-top:3px}
+.bcard .fzh{font-size:calc(11px*var(--fs));color:var(--sub);margin-top:3px}
+.bcard .fzb{display:flex;gap:6px;align-items:center;margin-top:6px}
+.bcard .fzmsg{font-size:calc(11.5px*var(--fs));color:var(--accent)}
 .bcard .cx{position:absolute;top:4px;right:6px;border:0;background:none;color:var(--sub);font-size:calc(18px*var(--fs));cursor:pointer;padding:2px 5px;line-height:1}
 .grip.cg{width:calc(13px*var(--fs));height:calc(13px*var(--fs));padding:0;border-radius:50%;background:var(--c);flex:none;display:inline-block;box-shadow:0 0 0 1.5px var(--panel),0 0 0 2.5px color-mix(in srgb,var(--ink) 25%,transparent);cursor:pointer;margin:0 3px}
 .grip.cg:hover{background:var(--c);transform:scale(1.18)}
@@ -334,7 +342,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.29</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.30</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
 <div class="wrap">
 
   <div class="panel">
@@ -495,6 +503,7 @@ textarea{width:100%;min-height:80px}
   <section id="h-see"><h3>見る</h3>
     <ul>
       <li><b>なぞる</b>：グラフの上でマウスを動かす（指でさわる）と、その年と、その年に各人が何歳だったかが出る。</li>
+      <li><b>自分でぼかす</b>：帯を押してカードの「始まりをぼかす」「終わりをぼかす」（人なら生年・没年）を押すと、「前1000〜前300」のようにはばを書いて、そのはしをぼかせる。元のデータは変えずに上書きするだけで、「ぼかしをやめる」でもどる。</li>
       <li><b>カード</b>：帯を押すと、そばにカードが出て、生没年・かんたんなプロフィール・諸説のメモと、Wikipedia・Wikidataへのリンクが出る。外を押すか × でとじる。</li>
       <li><b>重なりを調べる</b>：帯を2本クリックすると、同時に生きてた期間（重なってた期間）が出る。もう一度押すと選ぶのをやめる。</li>
       <li><b>拡大・縮小</b>：「−」「＋」「全体」ボタン、ctrl＋ほいーる、すまほは2本指。</li>
@@ -1421,7 +1430,7 @@ async function fetchPeople(ids, size=80, prog){
   const res={}; for(const id in out) res[id]=finishPerson(out[id]);
   return res;
 }
-function pickFields(p){ const o={id:p.id, n:p.n, desc:p.desc||''}; for(const k of PFIELDS) if(p[k]!=null) o[k]=p[k]; if(o.d===undefined) o.d=null; return o; }
+function pickFields(p){ if(p._o) p={...p, ...p._o}; const o={id:p.id, n:p.n, desc:p.desc||''}; for(const k of PFIELDS) if(p[k]!=null) o[k]=p[k]; if(o.d===undefined) o.d=null; return o; }
 // 表示用
 const midB=p=>Math.round((p.b+(p.b2??p.b))/2);
 const midD=p=>Math.round((p.d+(p.d2??p.d))/2);
@@ -1430,8 +1439,41 @@ const fuzzD=p=>p.d2!=null||!!p.dc;
 function txtOf(v, mid, list){ if(list && list.length===1) return list[0]; if(list && list.length>1) return yearLabel(mid,9,true); return v<=0?'前'+(1-v):String(v); }
 const birthTxt=p=>p.b==null?'':txtOf(p.b, midB(p), p.bv);
 const deathTxt=p=>p.d==null?(p.du?'不明':''):txtOf(p.d, midD(p), p.dv);
+/* ---------- 自分でぼかす（始まり・終わり） ----------
+   FZ：id → {b:'前14500〜前13000', d:'前1000〜前300'}（書いた文字のまま） */
+let FZ = {};
+const FZ_FIELDS=['b','b2','bc','bv','bq','bdc','bm','bl','d','d2','dc','dv','dq','ddc','dm','dl','du','now'];
+// 「前1000〜前300」「前10世紀〜前4世紀」「前14000頃」→ [はじめ, おわり]
+function parseRange(t){
+  const parts=String(t||'').split(/[〜~～]|(?<=\S)\s*[-–—]\s*(?=前|\d)/).map(x=>x.trim()).filter(Boolean);
+  if(!parts.length || parts.length>2) return null;
+  const ys=parts.map(pyear); if(ys.some(y=>!y)) return null;
+  const lo=Math.min(...ys.map(y=>y[0])), hi=Math.max(...ys.map(y=>y[1]));
+  return [lo,hi];
+}
+function applyFZ(id){
+  const p=PEOPLE[id]; if(!p) return;
+  const f=FZ[id]||null, key=JSON.stringify(f);
+  if(p._fzKey===key) return;
+  if(!p._o){ if(!f) return; p._o={}; for(const k of FZ_FIELDS) p._o[k]=p[k]; }
+  for(const k of FZ_FIELDS){ if(p._o[k]===undefined) delete p[k]; else p[k]=p._o[k]; }     // いったん元にもどす
+  if(f && f.b){ const r=parseRange(f.b); if(r){ const was=p.bm??p.b;
+    p.b=r[0]; if(r[1]>r[0]) p.b2=r[1]; else delete p.b2; ['bc','bq','bdc'].forEach(k=>delete p[k]);
+    if(isPeriod(p)){ p.bm = Math.min(r[1], Math.max(r[0], was)); if(!p._o.bl) p.bl=fmtY(p.bm); } else p.bv=[f.b]; } }   // 表示の年はもとの年のまま
+  if(f && f.d){ const r=parseRange(f.d); if(r){ const was=p.dm??p.d??CUR;
+    p.d=r[0]; if(r[1]>r[0]) p.d2=r[1]; else delete p.d2; ['dc','dq','ddc','du','now'].forEach(k=>delete p[k]);
+    if(isPeriod(p)){ p.dm = Math.min(r[1], Math.max(r[0], was)); if(!p._o.dl) p.dl=fmtY(p.dm); } else p.dv=[f.d]; } }
+  if(f) p._fzKey=key; else { delete p._o; delete p._fzKey; }
+}
+function applyAllFZ(){ for(const id of list){ const p=PEOPLE[id]; if(p && (FZ[id] || p._o)) applyFZ(id); } }
+function fzNote(id){ const f=FZ[id]; if(!f) return ''; const a=[]; if(f.b) a.push('始まり：'+f.b); if(f.d) a.push('終わり：'+f.d); return a.length ? a.join('・')+'（自分でぼかした）' : ''; }
+function fzSuggest(p, k){
+  const len = Math.max(1, ((p.d??CUR) - p.b)), w = Math.max(3, Math.min(1000, Math.round(len*0.04/ (len>200?10:1)) * (len>200?10:1)));
+  const y = k==='b' ? (p.bm??p.b) : (p.dm??p.d??CUR);
+  return `${fmtY(y-w)}〜${fmtY(y+w)}`;
+}
 function noteOf(p){
-  const a=[];
+  const a=[]; if(p._o) a.push(fzNote(p.id));
   if(p.bv && p.bv.length>1) a.push('生年 諸説：'+p.bv.join('・'));
   if(p.dv && p.dv.length>1) a.push('没年 諸説：'+p.dv.join('・'));
   if(p.bq) a.push('生年：Wikidataでは「疑わしい」とされてる年');
@@ -1528,12 +1570,13 @@ function packState(){
   const L=list.map(id=>{ const p=PEOPLE[id];
     if(/^Q\d+$/.test(id)) return +id.slice(1);
     if(p && p.pre){ const k=presetKey(p,'items'); if(k) return k; }
-    return ['p', p.n, p.b, p.d]; });
+    { const q=p._o?{...p,...p._o}:p; return ['p', q.n, q.b, q.d]; }; });
   const E=events.map(e=>{ if(e.pre){ const k=presetKey(e,'events'); if(k) return k; } return ['e', e.n, e.y]; });
   const o={L, v:viewCode()};
   if(DUR.length) o.D=DUR.map(d=>d.pk ? d.pk : ['h', d.n, d.lo, d.hi, d.mx, d.src||'', d.q||'']);
   if(E.length) o.E=E;
   packColors(o, list.slice(), DUR.map(d=>d.id));
+  const fz={}; list.forEach((id,i)=>{ const f=FZ[id]; if(f && (f.b||f.d)) fz['L'+i]=[f.b||'', f.d||'']; }); if(Object.keys(fz).length) o.fz=fz;
   const bk=[...BRK].map(([id,c])=>{ const i=list.indexOf(id), j=DUR.findIndex(d=>d.id===id); const k = i>=0 ? 'L'+i : j>=0 ? 'D'+j : null;
     return k && (k + (c>0 ? ':'+(+c.toPrecision(4)) : '')); }).filter(Boolean);
   if(bk.length) o.bk=bk;
@@ -1562,6 +1605,7 @@ async function unpackState(o){
     Dids.push(DUR.length>n0 ? DUR[DUR.length-1].id : null);
   }
   unpackColors(o, Lids, Dids);
+  FZ={}; for(const [k,v] of Object.entries(o.fz||{})){ const id=Lids[+k.slice(1)]; if(!id) continue; const f={}; if(v[0]) f.b=v[0]; if(v[1]) f.d=v[1]; FZ[id]=f; }
   BRK = new Map((o.bk||[]).map(k=>{ const [key,c]=String(k).split(':'); const id = key[0]==='L' ? Lids[+key.slice(1)] : Dids[+key.slice(1)]; return id ? [id, c?+c:null] : null; }).filter(Boolean));
   for(const x of o.E||[]){
     const id='E'+(manSeq++);
@@ -1633,6 +1677,7 @@ function endOf(p){
 }
 function periodNote(p){
   const a=[];
+  if(p._o) return [fzNote(p.id), p.note].filter(Boolean).join(' ／ ');
   if(p.bv && p.bv.length>1) a.push('始まり 諸説：'+p.bv.join('・'));
   if(p.dv && p.dv.length>1) a.push('終わり 諸説：'+p.dv.join('・'));
   if(p.note) a.push(p.note);
@@ -1697,6 +1742,7 @@ function viewInfo(){
   return {sc, len, vis, pos, span, center: geo.min + (pos+vis/2)/len*span, dur:!!geo.dur};
 }
 function render(){
+  applyAllFZ();
   const chart = $('#chart');
   const V = SET.orient==='v';
   const prev = viewInfo();
@@ -2128,6 +2174,7 @@ function showCard(id, x, y){
     <div class="t"><i style="background:${col(id)}"></i>${esc(name)}</div>
     ${yrs?`<div class="y">${esc(yrs)}</div>`:''}${descHTML}
     ${note?`<div class="nt">${esc(note)}</div>`:''}${src?`<div class="nt">出典：${esc(src)}</div>`:''}
+    ${p ? fzButtons(id, p) : ''}
     ${SET.mode==='dur'?ratioHTML(id):''}
     ${qid?`<div class="lk" id="bcLinks">${cardLinks(qid, LINKS[qid])}</div>`:''}
     ${SET.mode==='dur'?`<div class="lk"><button class="cbtn" data-brk="${id}">${BRK.has(id)?'省略をやめる':'〰 途中を省略する'}</button></div>`:''}`;
@@ -2176,11 +2223,47 @@ function ratioHTML(id){
     const t = x>=1.05 ? `約${fmtRatio(x)}倍` : x<=0.95 ? `約${fmtRatio(1/x)}分の1` : 'ほぼ同じ';
     return `<span><b>${esc(o.n)}</b>の${t}</span>`; }).join('')}</div>`;
 }
+function fzButtons(id, p){
+  const f=FZ[id]||{}, per=isPeriod(p);
+  const lb = k => per ? (k==='b'?'始まり':'終わり') : (k==='b'?'生年':'没年');
+  const btn = k => f[k] ? `<button class="cbtn on" data-fz="${k}" data-off="1">${lb(k)}のぼかしをやめる</button>`
+                        : `<button class="cbtn" data-fz="${k}">${k==='b'?'〜 ':''}${lb(k)}をぼかす${k==='d'?' 〜':''}</button>`;
+  return `<div class="fzrow">${btn('b')}${btn('d')}</div><div class="fzin" id="fzIn" hidden></div>`;
+}
+function fzOpen(id, k){
+  const p=PEOPLE[id], box=$('#fzIn'); if(!p||!box) return;
+  const per=isPeriod(p), lb = per ? (k==='b'?'始まり':'終わり') : (k==='b'?'生年':'没年');
+  const base = p._o ? {...p, ...p._o} : p;
+  box.hidden=false; box.dataset.k=k;
+  box.innerHTML = `<label>${lb}をどこからどこまで？<input type="text" id="fzText" value="${esc(fzSuggest(base,k))}"></label>
+    <div class="fzh">例：前1000〜前300 ／ 前10世紀〜前4世紀 ／ 前14000頃 ／ 1350〜1360</div>
+    <div class="fzb"><button class="cbtn" data-fzok="1">決定</button><button class="cbtn" data-fzcancel="1">やめる</button><span class="fzmsg" id="fzMsg"></span></div>`;
+  const t=$('#fzText'); t.focus(); t.select();
+  t.addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); fzCommit(id); } ev.stopPropagation(); });
+}
+function fzCommit(id){
+  const box=$('#fzIn'), k=box.dataset.k, t=$('#fzText').value.trim();
+  const r=parseRange(t);
+  if(!r){ $('#fzMsg').textContent='年が読めない…（例：前1000〜前300）'; return; }
+  if(r[1]<=r[0]){ $('#fzMsg').textContent='はばがない…「〜」で2つの年を書いてネ'; return; }
+  FZ[id]={...(FZ[id]||{}), [k]:t}; refreshAfterFZ(id);
+  toast(`ぼかした：${t}`);
+}
+function fzOff(id, k){ const f={...(FZ[id]||{})}; delete f[k]; if(Object.keys(f).length) FZ[id]=f; else delete FZ[id]; applyFZ(id); refreshAfterFZ(id); toast('ぼかしをやめた（元のデータ）'); }
+function refreshAfterFZ(id){
+  const c=$('#bcard'), x=parseFloat(c.style.left)||100, y=parseFloat(c.style.top)||100, w=c.offsetWidth;
+  render(); syncURL();
+  showCard(id, x-18+0, y+24); c.style.left=x+'px'; c.style.top=y+'px';   // カードは同じ場所で中身だけ新しく
+}
 function hideCard(){ $('#bcard').style.display='none'; $('#bcard').dataset.id=''; }
-$('#bcard').addEventListener('click', ev=>{ if(ev.target.closest('.cx')) hideCard(); const b=ev.target.closest('[data-brk]'); if(b) toggleBreak(b.dataset.brk); });
+$('#bcard').addEventListener('click', ev=>{ if(ev.target.closest('.cx')) hideCard(); const b=ev.target.closest('[data-brk]'); if(b) toggleBreak(b.dataset.brk);
+  const id=$('#bcard').dataset.id, z=ev.target.closest('[data-fz]');
+  if(z){ if(z.dataset.off) fzOff(id, z.dataset.fz); else fzOpen(id, z.dataset.fz); return; }
+  if(ev.target.closest('[data-fzok]')) fzCommit(id);
+  if(ev.target.closest('[data-fzcancel]')){ $('#fzIn').hidden=true; } });
 document.addEventListener('click', ev=>{ if(!ev.target.isConnected) return; if(!ev.target.closest('#bcard,[data-sel],#chart .dh,#chart .row')) hideCard(); });
 window.addEventListener('scroll', hideCard, {passive:true});
-document.addEventListener('keydown', ev=>{ if(ev.key==='Escape') hideCard(); });
+document.addEventListener('keydown', ev=>{ if(ev.key==='Escape' && !(document.activeElement && document.activeElement.id==='fzText')) hideCard(); });
 $('#evpop').addEventListener('click', ev=>{ const b=ev.target.closest('[data-evdel]'); if(!b) return;
   events=events.filter(e=>e.id!==b.dataset.evdel); hideEvPop(); render(); syncURL(); });
 document.addEventListener('click', ev=>{ if(!ev.target.closest('.evlb') && !ev.target.closest('#evpop')) hideEvPop(); });
@@ -2581,7 +2664,7 @@ $('#titleH').addEventListener('blur', ()=>syncTitle(true));
 $('#title').addEventListener('input', ()=>syncTitle(false));
 $('#title').addEventListener('input', ()=>{ clearTimeout($('#title')._t); $('#title')._t=setTimeout(syncURL,300); });
 $('#clear').addEventListener('click', ()=>{ runId++; list.filter(id=>/^M/.test(id)).forEach(id=>delete PEOPLE[id]);
-  list=[]; events=[]; DUR=[]; BRK=new Map(); selected=[]; colorIdx={}; nextColor=0; resetGroups(); ECOL={}; render(); syncURL(); });
+  list=[]; events=[]; DUR=[]; BRK=new Map(); FZ={}; selected=[]; colorIdx={}; nextColor=0; resetGroups(); ECOL={}; render(); syncURL(); });
 $('#share').addEventListener('click', async ()=>{
   await syncURL();
   try{ await navigator.clipboard.writeText(location.href); toast('URLコピーした！'); }catch(e){ prompt('このURLを共有',location.href); }
@@ -2647,9 +2730,9 @@ $('#shotCopyV').addEventListener('click', async ()=>{
 
 /* ---------- 表示の保存・読み込み ---------- */
 function snapshot(){
-  const item = id => { const p=PEOPLE[id]; if(!p) return null; if(isPeriod(p)) return {...p}; const o=pickFields(p); if(p.type) o.type=p.type; return o; };
+  const item = id => { const p=PEOPLE[id]; if(!p) return null; if(isPeriod(p)){ const o={...p, ...(p._o||{})}; delete o._o; delete o._fzKey; for(const k in o) if(o[k]===undefined) delete o[k]; return o; } const o=pickFields(p); if(p.type) o.type=p.type; return o; };
   return {app:'seibotsunen-graph', version:1, saved:new Date().toISOString(),
-    title:$('#title').value.trim(), order:list.slice(), items:list.map(item).filter(Boolean), events:events.map(e=>({...e})), dur:DUR.map(d=>({...d})), brk:[...BRK],
+    title:$('#title').value.trim(), order:list.slice(), items:list.map(item).filter(Boolean), events:events.map(e=>({...e})), dur:DUR.map(d=>({...d})), brk:[...BRK], fz:{...FZ},
     colors:{groups:GROUPS.map(G=>({...G})), grp:Object.fromEntries(Object.entries(GRP).filter(([id])=>list.includes(id)||DUR.some(d=>d.id===id))), ecol:{...ECOL}, active:ACTIVE, gseq:GSEQ},
     selected:selected.slice(), settings:{...SET, sort:$('#sort').value, era:$('#era').value}};
 }
@@ -2671,6 +2754,7 @@ $('#loadFile').addEventListener('change', async ev=>{
     runId++;
     list.filter(id=>/^M/.test(id)).forEach(id=>delete PEOPLE[id]);
     for(const it of d.items||[]){ if(!it || !it.id) continue; PEOPLE[it.id]={...it}; const m=/^[ME](\d+)$/.exec(it.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; }
+    FZ={...(d.fz||{})};
     DUR=(d.dur||[]).map(x=>({...x})); BRK=new Map((d.brk||[]).map(x=>Array.isArray(x)?x:[x,null])); DUR.forEach(x=>{ const m=/^D(\d+)$/.exec(x.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; });
     events=(d.events||[]).map(e=>({...e})); events.forEach(e=>{ const m=/^E(\d+)$/.exec(e.id); if(m && +m[1]>=manSeq) manSeq=+m[1]+1; });
     list=(d.order||[]).filter(id=>PEOPLE[id]); selected=(d.selected||[]).filter(id=>list.includes(id));
