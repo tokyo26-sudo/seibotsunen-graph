@@ -347,7 +347,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.31</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.32</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
 <div class="wrap">
 
   <div class="panel">
@@ -508,7 +508,7 @@ textarea{width:100%;min-height:80px}
   <section id="h-see"><h3>見る</h3>
     <ul>
       <li><b>なぞる</b>：グラフの上でマウスを動かす（指でさわる）と、その年と、その年に各人が何歳だったかが出る。</li>
-      <li><b>自分でぼかす</b>：帯を押してカードの「始まりをぼかす」「終わりをぼかす」（人なら生年・没年）を押すと、つまみ（スライダー）か「少し・ふつう・大きく」でぼかしのはばを決められる。動かすと帯がその場でぼける。「くわしく」を開くと「前1000〜前300」のように年で書くこともできる。元のデータは変えずに上書きするだけで、「ぼかしをやめる」でもどる。</li>
+      <li><b>自分でぼかす</b>：帯を押してカードの「始まりのぼかし」「終わりのぼかし」（人なら生年・没年）を押すだけ。押すたびに「ふつう→大きく→少し→なし」と切りかわる。はばは帯の長さに合わせて自動で決まる。元のデータは変えずに上書きするだけ。長さくらべでも始まり・終わりの両方がぼける（いちばん早い始まりを0にそろえる）。</li>
       <li><b>カード</b>：帯を押すと、そばにカードが出て、生没年・かんたんなプロフィール・諸説のメモと、Wikipedia・Wikidataへのリンクが出る。外を押すか × でとじる。</li>
       <li><b>重なりを調べる</b>：帯を2本クリックすると、同時に生きてた期間（重なってた期間）が出る。もう一度押すと選ぶのをやめる。</li>
       <li><b>拡大・縮小</b>：「−」「＋」「全体」ボタン、ctrl＋ほいーる、すまほは2本指。</li>
@@ -962,18 +962,22 @@ function durRows(){
       const lo = Math.max(0, e - (p.b2??p.b)), hi = Math.max(lo, e2 - p.b);
       if(!(hi>0)) continue;
       const fz = hi>lo;
+      const s0=p.b, s1=p.b2??p.b;                          // 始まりのはば
       rows.push({id, n:p.n, lo:lo*YS, hi:hi*YS, mid:Math.max(main,0)*YS, mx:null,
+        x1:(s1-s0)*YS, x2:Math.max(s1-s0, e-s0)*YS, x3:(e2-s0)*YS,
         txt:`${fz?'約':''}${nf(main)}年間${p.now?'〜':''}${fz?`（${nf(lo)}〜${nf(hi)}年）`:''}`, note:periodNote(p), period:1});
       continue;
     }
     const lf=life(p); if(lf==null || lf<0) continue;
-    rows.push({id, n:p.n, lo:lf*YS, hi:lf*YS, mid:lf*YS, mx:null, txt:`享年 ${lifeFuzzy(p)?'約':''}${lf}年`, note:p.desc||'', person:1}); }
+    const [s0,s1]=bZone(p), en=endOf(p);
+    const dr = en.kind==='dead' ? {x1:(s1-s0)*YS, x2:Math.max(s1-s0, en.a-s0)*YS, x3:Math.max(en.a, en.z)*YS - s0*YS} : {};
+    rows.push({id, n:p.n, lo:lf*YS, hi:lf*YS, mid:lf*YS, mx:null, ...dr, txt:`享年 ${lifeFuzzy(p)?'約':''}${lf}年`, note:p.desc||'', person:1}); }
   for(const d of DUR) rows.push({...d, mid:(d.lo+d.hi)/2});
   rows.sort((a,b)=> SET.dsort==='desc' ? b.hi-a.hi : a.lo-b.lo);
   return rows;
 }
 function autoUnit(maxSec){
-  for(const k of ['oku','man','y','d','h','min','s']) if(maxSec/DUNITS[k][0] >= 1.5) return k;
+  for(const k of ['oku','man','y','d','h','min','s']) if(maxSec/DUNITS[k][0] >= (k==='man'||k==='oku' ? 5 : 1.5)) return k;   // 万年・億年は5以上から（0.2万年みたいにならないように）
   return 's';
 }
 const LOGTICKS=[[1e-6,'1マイクロ秒'],[1e-4,'0.1ミリ秒'],[1e-3,'1ミリ秒'],[1,'1秒'],[60,'1分'],[3600,'1時間'],[86400,'1日'],[86400*30.44,'1か月'],[YS,'1年'],[10*YS,'10年'],[100*YS,'100年'],
@@ -997,7 +1001,7 @@ function renderDur(chart){
   $('#zbar').hidden=false;
   lastColorIds=rows.map(r=>r.id); prepColors(lastColorIds); drawLegend(lastColorIds);
   const isLog = SET.dunit==='log', isPx = SET.dunit==='px';
-  const ext = r => r.mx||r.hi;
+  const ext = r => r.mx || Math.max(r.hi, r.x3||0);
   const nb = rows.filter(r=>!BRK.has(r.id));
   const second = nb.length ? Math.max(...nb.map(ext)) : 0;
   const capOf = r => { const c=BRK.get(r.id); return c>0 ? c : Math.max(second*1.3, 1); };   // 古い共有URLなどで位置がないとき
@@ -1030,12 +1034,18 @@ function renderDur(chart){
   const rowsH = rows.map(r=>{
     const c=col(r.id);
     const cut = isCut(r);
-    const a0=ax(r.lo), a1=ax(r.hi), am=r.mx?ax(r.mx):null;
+    // x1：始まりのぼかしが終わる所、x2：終わりのぼかしが始まる所、x3：最大でもここまで（いちばん早い始まりが0）
+    const hasX = r.x3!=null && r.x3>0;
+    const a0=ax(hasX ? r.x2 : r.lo), a1=ax(hasX ? r.x3 : r.hi), am=r.mx?ax(r.mx):null;
+    const X1 = hasX && !isLog && r.x1>0 ? ax(r.x1) : null;
     const right = cut ? ax(capOf(r)) : Math.max(a1, am??a1);
     const w = Math.max(right-left, 1e-9), pc = v => ((v-left)/w*100).toFixed(2)+'%';
     const st=[`${c} 0%`];
     const EASE=[[0,0],[.15,.04],[.3,.13],[.45,.28],[.6,.47],[.75,.68],[.88,.86],[1,1]];
     const fade=(f,t)=>EASE.map(([u,e])=>`${col(r.id, Math.max(0.001,1-e))} ${(f+(t-f)*u).toFixed(2)}%`);   // 濃い→地の色まで
+    const fadeIn=(f,t)=>EASE.map(([u,e])=>`${col(r.id, Math.max(0.001,e))} ${(f+(t-f)*u).toFixed(2)}%`);   // 地の色→濃い
+    const xin = X1==null ? 0 : cut ? Math.min(8, parseFloat(pc(X1))) : Math.min(100, parseFloat(pc(X1)));   // 〰の帯は目盛りどおりじゃないので、左に少しだけ
+    if(X1!=null){ st.length=0; st.push(...fadeIn(0, xin)); }
     if(cut){ if(r.hi>r.lo || (am!=null && am>a1)) st.push(`${c} 86%`, ...fade(86,100)); else st.push(`${c} 100%`); }
     else if(a1>a0 && !(am!=null && am>a1)){ st.push(`${c} ${pc(a0)}`, ...fade(parseFloat(pc(a0)), parseFloat(pc(a1)))); }
     else if(a1>a0){ st.push(`${c} ${pc(a0)}`, `${col(r.id,.55)} ${pc(a1)}`); } else st.push(`${c} ${pc(a1)}`);
@@ -1043,7 +1053,7 @@ function renderDur(chart){
     const tip = [r.n+' '+r.txt, r.note, r.src?('出典：'+r.src):''].filter(Boolean).join('\n');
     return `<div class="row" data-id="${r.id}">
       <div class="name dh" data-id="${r.id}">${handle(r)}<span class="nm" title="${esc(r.n)}">${esc(r.n)}</span>${r.person?'<span class="tag">享年</span>':r.period?'<span class="tag">期間</span>':''}</div>
-      <div class="track"><div class="bar dead${!cut&&am!=null&&am>a1?' fd':''}${cut?' cutbar':''}${r.period?' period':''}" style="left:${P(left)};width:${S(left,right)};background:linear-gradient(90deg, ${st.join(', ')})" title="${esc(tip)}"><span class="lb" style="left:0%"><b>${esc(r.n)}</b>${esc(r.txt)}${cut?'（途中省略）':''}</span>${cut?'<span class="brk" title="押すと省略をやめる"></span>':''}</div>
+      <div class="track"><div class="bar dead${!cut&&am!=null&&am>a1?' fd':''}${cut?' cutbar':''}${r.period?' period':''}" style="left:${P(left)};width:${S(left,right)};background:linear-gradient(90deg, ${st.join(', ')})" title="${esc(tip)}"><span class="lb" style="left:${Math.min(60, xin).toFixed(2)}%"><b>${esc(r.n)}</b>${esc(r.txt)}${cut?'（途中省略）':''}</span>${cut?'<span class="brk" title="押すと省略をやめる"></span>':''}</div>
       <span class="lbo"><b>${esc(r.n)}</b><span>${esc(r.txt)}${cut?'（途中省略）':''}</span></span></div></div>`;
   }).join('');
   chart.style.setProperty('--namew', NW+'px');
@@ -1459,22 +1469,37 @@ function parseRange(t){
   const lo=Math.min(...ys.map(y=>y[0])), hi=Math.max(...ys.map(y=>y[1]));
   return [lo,hi];
 }
+const FZ_LV = {s:['少し',0.02,2], m:['ふつう',0.05,4], l:['大きく',0.10,8]};
+const FZ_NEXT = {'':'m', m:'l', l:'s', s:''};          // 押すたびに ふつう→大きく→少し→なし
+// 段階 → 「前1100〜前300」のようなはば（元の年のまわりに、帯の長さに合わせて）
+function fzRangeText(p, k, v){
+  if(!FZ_LV[v]) return v;                              // 前のしくみで書いた年はそのまま
+  const o = p._o ? {...p, ...p._o} : p;
+  const y = k==='b' ? (o.bm??o.b) : (o.dm??o.d??CUR);
+  const L = Math.max(1, (o.dm??o.d??CUR) - (o.bm??o.b));
+  const raw = Math.max(FZ_LV[v][2], L*FZ_LV[v][1]);
+  const w = raw>=200 ? Math.round(raw/50)*50 : raw>=40 ? Math.round(raw/10)*10 : Math.round(raw);
+  return `${fmtY(y-w)}〜${fmtY(y+w)}`;
+}
 function applyFZ(id){
   const p=PEOPLE[id]; if(!p) return;
   const f=FZ[id]||null, key=JSON.stringify(f);
   if(p._fzKey===key) return;
   if(!p._o){ if(!f) return; p._o={}; for(const k of FZ_FIELDS) p._o[k]=p[k]; }
   for(const k of FZ_FIELDS){ if(p._o[k]===undefined) delete p[k]; else p[k]=p._o[k]; }     // いったん元にもどす
-  if(f && f.b){ const r=parseRange(f.b); if(r){ const was=p.bm??p.b;
+  if(f && f.b){ const r=parseRange(fzRangeText(p,'b',f.b)); if(r){ const was=p.bm??p.b;
     p.b=r[0]; if(r[1]>r[0]) p.b2=r[1]; else delete p.b2; ['bc','bq','bdc'].forEach(k=>delete p[k]);
-    if(isPeriod(p)){ p.bm = Math.min(r[1], Math.max(r[0], was)); if(!p._o.bl) p.bl=fmtY(p.bm); } else p.bv=[f.b]; } }   // 表示の年はもとの年のまま
-  if(f && f.d){ const r=parseRange(f.d); if(r){ const was=p.dm??p.d??CUR;
+    if(isPeriod(p)){ p.bm = Math.min(r[1], Math.max(r[0], was)); if(!p._o.bl) p.bl=fmtY(p.bm); } else p.bv=[fzRangeText(p,'b',f.b)]; } }   // 表示の年はもとの年のまま
+  if(f && f.d){ const r=parseRange(fzRangeText(p,'d',f.d)); if(r){ const was=p.dm??p.d??CUR;
     p.d=r[0]; if(r[1]>r[0]) p.d2=r[1]; else delete p.d2; ['dc','dq','ddc','du','now'].forEach(k=>delete p[k]);
-    if(isPeriod(p)){ p.dm = Math.min(r[1], Math.max(r[0], was)); if(!p._o.dl) p.dl=fmtY(p.dm); } else p.dv=[f.d]; } }
+    if(isPeriod(p)){ p.dm = Math.min(r[1], Math.max(r[0], was)); if(!p._o.dl) p.dl=fmtY(p.dm); } else p.dv=[fzRangeText(p,'d',f.d)]; } }
   if(f) p._fzKey=key; else { delete p._o; delete p._fzKey; }
 }
 function applyAllFZ(){ for(const id of list){ const p=PEOPLE[id]; if(p && (FZ[id] || p._o)) applyFZ(id); } }
-function fzNote(id){ const f=FZ[id]; if(!f) return ''; const a=[]; if(f.b) a.push('始まり：'+f.b); if(f.d) a.push('終わり：'+f.d); return a.length ? a.join('・')+'（自分でぼかした）' : ''; }
+function fzNote(id){ const f=FZ[id]; if(!f) return ''; const p=PEOPLE[id]; const a=[];
+  const t = (k,v) => FZ_LV[v] ? `ぼかし${FZ_LV[v][0]}（${p?fzRangeText(p,k,v):''}）` : v;
+  if(f.b) a.push('始まり：'+t('b',f.b)); if(f.d) a.push('終わり：'+t('d',f.d));
+  return a.length ? a.join('・')+'（自分でぼかした）' : ''; }
 function fzSuggest(p, k){
   const len = Math.max(1, ((p.d??CUR) - p.b)), w = Math.max(3, Math.min(1000, Math.round(len*0.04/ (len>200?10:1)) * (len>200?10:1)));
   const y = k==='b' ? (p.bm??p.b) : (p.dm??p.d??CUR);
@@ -2234,56 +2259,17 @@ function ratioHTML(id){
 function fzButtons(id, p){
   const f=FZ[id]||{}, per=isPeriod(p);
   const lb = k => per ? (k==='b'?'始まり':'終わり') : (k==='b'?'生年':'没年');
-  const btn = k => f[k] ? `<button class="cbtn on" data-fz="${k}" data-off="1">${lb(k)}のぼかしをやめる</button>`
-                        : `<button class="cbtn" data-fz="${k}">${k==='b'?'〜 ':''}${lb(k)}をぼかす${k==='d'?' 〜':''}</button>`;
-  const durNote = SET.mode==='dur' && f.b ? `<div class="fzh">長さくらべはスタートを0にそろえてるので、始まりのゆれも先っぽのぼかしにまとめて出してる（年表にすると始まりにも出る）</div>` : '';
-  return `<div class="fzrow">${btn('b')}${btn('d')}</div>${durNote}<div class="fzin" id="fzIn" hidden></div>`;
+  const now = k => !f[k] ? 'なし' : FZ_LV[f[k]] ? FZ_LV[f[k]][0] : '年で指定';
+  const btn = k => `<button class="cbtn${f[k]?' on':''}" data-fz="${k}" title="押すたびに ふつう→大きく→少し→なし">${k==='b'?'〜 ':''}${lb(k)}のぼかし：${now(k)}${k==='d'?' 〜':''}</button>`;
+  return `<div class="fzrow">${btn('b')}${btn('d')}</div>`;
 }
-function fzOpen(id, k){
-  const p=PEOPLE[id], box=$('#fzIn'); if(!p||!box) return;
-  const per=isPeriod(p), lb = per ? (k==='b'?'始まり':'終わり') : (k==='b'?'生年':'没年');
-  const base = p._o ? {...p, ...p._o} : p;
-  const y = k==='b' ? (base.bm??base.b) : (base.dm??base.d??CUR);
-  const L = Math.max(1, (base.dm??base.d??CUR) - (base.bm??base.b));
-  const nice = v => v>=200 ? Math.round(v/50)*50 : v>=40 ? Math.round(v/10)*10 : Math.max(1, Math.round(v));
-  const lv = {s:nice(Math.max(2, L*0.02)), m:nice(Math.max(4, L*0.05)), l:nice(Math.max(8, L*0.10))};
-  const W = Math.max(lv.l*2, 10), step = W>=2000 ? 50 : W>=400 ? 10 : 1;
-  box._prev = FZ[id] ? {...FZ[id]} : null;
-  box.hidden=false; box.dataset.k=k; box.dataset.y=y;
-  box.innerHTML = `<div class="fzt">${lb}を、どのくらいぼかす？（動かすと帯がその場でぼける）</div>
-    <input type="range" id="fzRange" min="0" max="${W}" step="${step}" value="${lv.m}">
-    <div class="fzv" id="fzVal"></div>
-    <div class="fzb"><button class="cbtn" data-fzlv="${lv.s}">少し</button><button class="cbtn" data-fzlv="${lv.m}">ふつう</button><button class="cbtn" data-fzlv="${lv.l}">大きく</button></div>
-    <details class="fzd"><summary>くわしく（年で書く）</summary>
-      <input type="text" id="fzText">
-      <div class="fzh">例：前1000〜前300 ／ 前10世紀〜前4世紀 ／ 前14000頃 ／ 1350〜1360（前とうしろでちがうはばにもできる）</div></details>
-    <div class="fzb"><button class="cbtn on" data-fzok="1">決定</button><button class="cbtn" data-fzcancel="1">やめる</button><span class="fzmsg" id="fzMsg"></span></div>`;
-  const t=$('#fzText'), rg=$('#fzRange');
-  const setW = w => { w=+w; rg.value=w; t.value = `${fmtY(y-w)}〜${fmtY(y+w)}`; $('#fzVal').textContent = `${t.value}（前後に ${nf(w)}年）`; fzPreview(id, k, t.value); };
-  rg.addEventListener('input', ()=>setW(rg.value));
-  box.querySelectorAll('[data-fzlv]').forEach(b=>b.addEventListener('click', ev=>{ ev.stopPropagation(); setW(b.dataset.fzlv); }));
-  t.addEventListener('input', ()=>{ $('#fzVal').textContent=t.value; fzPreview(id, k, t.value); });
-  t.addEventListener('keydown', ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); fzCommit(id); } ev.stopPropagation(); });
-  setW(lv.m);
+function fzCycle(id, k){
+  const cur=(FZ[id]||{})[k]||'', nx = FZ_NEXT[!cur ? '' : FZ_LV[cur] ? cur : 's'];   // 年で指定してたものは「なし」へ
+  const f={...(FZ[id]||{})}; if(nx) f[k]=nx; else delete f[k];
+  if(Object.keys(f).length) FZ[id]=f; else delete FZ[id];
+  applyFZ(id); refreshAfterFZ(id);
+  toast(nx ? `ぼかし：${FZ_LV[nx][0]}` : 'ぼかし：なし（元のデータ）');
 }
-// 動かしてるあいだの見本（決定するまでは仮）
-function fzPreview(id, k, text){
-  const r=parseRange(text); if(!r || r[1]<=r[0]) return;
-  FZ[id]={...(FZ[id]||{}), [k]:text}; scheduleRender();
-}
-function fzCancel(id){
-  const box=$('#fzIn'); if(box._prev) FZ[id]=box._prev; else delete FZ[id];
-  applyFZ(id); box.hidden=true; render();
-}
-function fzCommit(id){
-  const box=$('#fzIn'), k=box.dataset.k, t=$('#fzText').value.trim();
-  const r=parseRange(t);
-  if(!r){ $('#fzMsg').textContent='年が読めない…（例：前1000〜前300）'; return; }
-  if(r[1]<=r[0]){ $('#fzMsg').textContent='はばがない…「〜」で2つの年を書いてネ'; return; }
-  FZ[id]={...(FZ[id]||{}), [k]:t}; refreshAfterFZ(id);
-  toast(`ぼかした：${t}`);
-}
-function fzOff(id, k){ const f={...(FZ[id]||{})}; delete f[k]; if(Object.keys(f).length) FZ[id]=f; else delete FZ[id]; applyFZ(id); refreshAfterFZ(id); toast('ぼかしをやめた（元のデータ）'); }
 function refreshAfterFZ(id){
   const c=$('#bcard'), x=parseFloat(c.style.left)||100, y=parseFloat(c.style.top)||100, w=c.offsetWidth;
   render(); syncURL();
@@ -2292,9 +2278,7 @@ function refreshAfterFZ(id){
 function hideCard(){ $('#bcard').style.display='none'; $('#bcard').dataset.id=''; }
 $('#bcard').addEventListener('click', ev=>{ if(ev.target.closest('.cx')) hideCard(); const b=ev.target.closest('[data-brk]'); if(b) toggleBreak(b.dataset.brk);
   const id=$('#bcard').dataset.id, z=ev.target.closest('[data-fz]');
-  if(z){ if(z.dataset.off) fzOff(id, z.dataset.fz); else fzOpen(id, z.dataset.fz); return; }
-  if(ev.target.closest('[data-fzok]')) fzCommit(id);
-  if(ev.target.closest('[data-fzcancel]')) fzCancel(id); });
+  if(z){ fzCycle(id, z.dataset.fz); return; } });
 document.addEventListener('click', ev=>{ if(!ev.target.isConnected) return; if(!ev.target.closest('#bcard,[data-sel],#chart .dh,#chart .row')) hideCard(); });
 window.addEventListener('scroll', hideCard, {passive:true});
 document.addEventListener('keydown', ev=>{ if(ev.key==='Escape' && !(document.activeElement && document.activeElement.id==='fzText')) hideCard(); });
