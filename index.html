@@ -361,7 +361,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.33</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.34</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
 <div class="wrap">
 
   <div class="panel">
@@ -372,7 +372,7 @@ textarea{width:100%;min-height:80px}
       </div>
       <span class="seg" id="orient"><button data-o="h" class="on" title="横表示（時間が左→右）">↔️</button><button data-o="v" title="縦表示（時間が上→下）">↕️</button><button data-o="dur" title="長さくらべ（寿命・半減期など、長さだけを比べる）">📏</button></span>
       <select id="dunit" title="目盛りの単位" style="display:none"><option value="auto">単位：自動</option><option value="s">秒</option><option value="min">分</option><option value="h">時間</option><option value="d">日</option><option value="y">年</option><option value="man">万年</option><option value="oku">億年</option><option value="log">対数</option><option value="px">1年＝1px（実寸）</option></select>
-      <select id="dsort" title="並べ順" style="display:none"><option value="asc">短い順</option><option value="desc">長い順</option></select>
+      <select id="dsort" title="並べ順" style="display:none"><option value="asc">短い順</option><option value="desc">長い順</option><option value="old">古い順</option><option value="new">新しい順</option></select>
       <button class="tog" data-sec="add" aria-expanded="false">＋ 足す</button>
       <button class="tog" data-sec="set" aria-expanded="false">⚙ 設定</button>
       <span class="menu"><button id="moreBtn" title="保存・読み込みなど">⋯</button>
@@ -569,6 +569,7 @@ textarea{width:100%;min-height:80px}
     <ul>
       <li>並べている人は<b>享年</b>で、期間（縄文時代・江戸時代など）は<b>何年続いたか</b>で出る。始まり・終わりに諸説があると、帯のはしがぼける。</li>
       <li><b>途中を省略（〰）</b>：見たい大きさまで拡大してから、帯を押してカードの「〰 途中を省略する」を押すと、その大きさのままその帯だけ途中をちょん切る（拡大してないときは2番目に長い帯より少し長いところで切る）。〰を押すと本当の長さにもどる。</li>
+      <li><b>並べ順</b>：短い順・長い順・古い順・新しい順。古い順は始まりが早い順（人なら生まれた順）。寿命・半減期のように「いつ」がないものは下にまとまる。10万年をこえる長さは「約19億6120万年間」のように丸めて出す。</li>
       <li><b>倍率</b>：帯を押すとカードに「江戸時代の約51倍」のように、ほかの帯とくらべた倍率が出る。</li>
       <li><b>1年＝1px（実寸）</b>：単位でこれを選ぶと1年が1ピクセル。縄文時代なら横に13600ピクセル。スクロールして長さを体で感じられる。</li>
       <li>プリセット「生き物の寿命」「放射性物質の半減期」がある。生き物は、濃い帯がふつうの寿命、うすく伸びた先が最長記録。</li>
@@ -985,17 +986,23 @@ function durRows(){
       if(!(hi>0)) continue;
       const fz = hi>lo;
       const s0=p.b, s1=p.b2??p.b;                          // 始まりのはば
-      rows.push({id, n:p.n, lo:lo*YS, hi:hi*YS, mid:Math.max(main,0)*YS, mx:null,
+      rows.push({id, n:p.n, st:p.bm??Math.round((p.b+(p.b2??p.b))/2), lo:lo*YS, hi:hi*YS, mid:Math.max(main,0)*YS, mx:null,
         x1:(s1-s0)*YS, x2:Math.max(s1-s0, e-s0)*YS, x3:(e2-s0)*YS,
-        txt:`${fz?'約':''}${nf(main)}年間${p.now?'〜':''}${fz?`（${nf(lo)}〜${nf(hi)}年）`:''}`, note:periodNote(p), period:1});
+        txt:`${fz||main>=1e5?'約':''}${yrsTxt(main)}年間${p.now?'〜':''}${fz?`（${yrsTxt(lo)}〜${yrsTxt(hi)}年）`:''}`, note:periodNote(p), period:1});
       continue;
     }
     const lf=life(p); if(lf==null || lf<0) continue;
     const [s0,s1]=bZone(p), en=endOf(p);
     const dr = en.kind==='dead' ? {x1:(s1-s0)*YS, x2:Math.max(s1-s0, en.a-s0)*YS, x3:Math.max(en.a, en.z)*YS - s0*YS} : {};
-    rows.push({id, n:p.n, lo:lf*YS, hi:lf*YS, mid:lf*YS, mx:null, ...dr, txt:`享年 ${lifeFuzzy(p)?'約':''}${lf}年`, note:p.desc||'', person:1}); }
+    rows.push({id, n:p.n, st:midB(p), lo:lf*YS, hi:lf*YS, mid:lf*YS, mx:null, ...dr, txt:`享年 ${lifeFuzzy(p)?'約':''}${lf}年`, note:p.desc||'', person:1}); }
   for(const d of DUR) rows.push({...d, mid:(d.lo+d.hi)/2});
-  rows.sort((a,b)=> SET.dsort==='desc' ? b.hi-a.hi : a.lo-b.lo);
+  if(SET.dsort==='old' || SET.dsort==='new'){
+    const sg = SET.dsort==='old' ? 1 : -1;
+    rows.sort((a,b)=>{ const A=a.st!=null, B=b.st!=null;
+      if(A && B) return sg*(a.st-b.st) || a.lo-b.lo;
+      if(A!==B) return A ? -1 : 1;              // 寿命・半減期みたいに「いつ」がないものは下へ
+      return a.lo-b.lo; });
+  } else rows.sort((a,b)=> SET.dsort==='desc' ? b.hi-a.hi : a.lo-b.lo);
   return rows;
 }
 function autoUnit(maxSec){
@@ -1322,7 +1329,8 @@ const SET = Object.assign({cmode:'group', legend:false, mode:'time', dunit:'auto
 /* ---------- 小物 ---------- */
 function $(s){ return document.querySelector(s); }
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmtY = y => y <= 0 ? '前' + (1 - y) : String(y);
+const fmtYraw = y => y <= 0 ? '前' + (1 - y) : String(y);          // 入力らん用（そのまま読みなおせる形）
+const fmtY = y => { const v = y<=0 ? 1-y : y; return Math.abs(v)>=1e6 ? (y<=0?'前':'')+yrsTxt(v) : fmtYraw(y); };   // 表示用：100万年より昔は「前46億」のように丸める
 function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('on'),1800); }
 function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
 function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
@@ -1501,7 +1509,7 @@ function fzRangeText(p, k, v){
   const L = Math.max(1, (o.dm??o.d??CUR) - (o.bm??o.b));
   const raw = Math.max(FZ_LV[v][2], L*FZ_LV[v][1]);
   const w = raw>=200 ? Math.round(raw/50)*50 : raw>=40 ? Math.round(raw/10)*10 : Math.round(raw);
-  return `${fmtY(y-w)}〜${fmtY(y+w)}`;
+  return `${fmtYraw(y-w)}〜${fmtYraw(y+w)}`;
 }
 function applyFZ(id){
   const p=PEOPLE[id]; if(!p) return;
@@ -1599,7 +1607,7 @@ function readViewCode(v){
   if(cm) SET.cmode = {g:'group',e:'each',n:'name'}[cm] || SET.cmode;
   if(md==='d') SET.mode='dur'; else if(md==='t') SET.mode='time';
   if(['auto','s','min','h','d','y','man','oku','log','px'].includes(du)) SET.dunit=du;
-  if(ds==='asc'||ds==='desc') SET.dsort=ds;
+  if(['asc','desc','old','new'].includes(ds)) SET.dsort=ds;
   if(['sys','ud','min','maru','hand'].includes(fo)) SET.font=fo;
   if(['0.85','1','1.25','1.6'].includes(fz)) SET.fs=+fz;
   if(['in','after','before'].includes(lp)) SET.lpos=lp;
@@ -1752,7 +1760,7 @@ function sorted(){
 }
 function niceStep(span, maxTicks){
   for(const s of [1,2,5,10,20,25,50,100,200,250,500,1000,2000]) if(span/s <= maxTicks) return s;
-  return 5000;
+  return Math.max(5000, durStep(span, maxTicks));   // 何億年でも目盛りが増えすぎないように
 }
 // 1人ぶんの帯のかたち
 function barOf(p){
@@ -1769,7 +1777,7 @@ function barOf(p){
   if(e.z>e.a) st.push(...ramp(e.a, e.z, true)); else st.push(`${c} 100%`);
   let txt;
   if(isPeriod(p)){ const bm=p.bm??p.b, dm=p.dm??p.d, fz=p.b2!=null||p.d2!=null||/頃|世紀/.test((p.bl||'')+(p.dl||''));
-    txt = `${p.bl||fmtY(p.b)}–${p.now?'今':(p.dl||fmtY(p.d))}（${fz?'約':''}${dm-bm}年間${p.now?'〜':''}）`; }
+    txt = `${p.bl||fmtY(p.b)}–${p.now?'今':(p.dl||fmtY(p.d))}（${fz||dm-bm>=1e5?'約':''}${yrsTxt(dm-bm)}年間${p.now?'〜':''}）`; }
   else {
     const lf = life(p), fz = lifeFuzzy(p);
     const dt = e.kind==='dead' ? deathTxt(p) : e.kind==='alive' ? '存命' : (p.du?'不明':'?');
@@ -2269,6 +2277,14 @@ function toggleBreak(id){
   const b=document.querySelector('#bcard [data-brk]'); if(b && b.dataset.brk===id) b.textContent = BRK.has(id) ? '省略をやめる' : '〰 途中を省略する';
   toast(BRK.has(id) ? '〰 いま見てた大きさで途中を省略した' : '省略をやめた（本当の長さ）');
 }
+// 年数の書き方：10万年までは1年きざみ、それより長いと「6600万」「19億6120万」のように丸める
+function yrsTxt(n){
+  n=Math.round(n); const a=Math.abs(n);
+  if(a<1e5) return nf(n);
+  if(a<1e8) return (n<0?'-':'')+Math.round(a/1e4).toLocaleString()+'万';
+  let ok=Math.floor(a/1e8), man=Math.round((a-ok*1e8)/1e4); if(man>=10000){ ok++; man=0; }
+  return (n<0?'-':'')+ok.toLocaleString()+'億'+(man?man+'万':'');
+}
 const fmtRatio = x => x>=10 ? Math.round(x).toLocaleString() : (Math.round(x*10)/10).toString();
 function ratioHTML(id){
   const rows=durRows(), me=rows.find(r=>r.id===id); if(!me || !(me.mid>0)) return '';
@@ -2548,7 +2564,7 @@ $('#manList').addEventListener('click', ev=>{
   }
   // なおす：上の欄に入れて「更新」
   const isE=/^E/.test(id), o = isE ? events.find(e=>e.id===id) : PEOPLE[id]; if(!o) return;
-  manEdit=id; $('#mName').value=o.n; $('#mS').value=fmtY(isE?o.y:o.b); $('#mE').value=isE?'':fmtY(o.d);
+  manEdit=id; $('#mName').value=o.n; $('#mS').value=fmtYraw(isE?o.y:o.b); $('#mE').value=isE?'':fmtYraw(o.d);
   $('#mAdd').textContent='更新'; $('#mCancel').style.display=''; manMsg('年をなおして「更新」。線⇔帯も年に合わせて自動で変わる');
   drawManList(); $('#mS').focus();
 });
