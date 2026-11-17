@@ -129,6 +129,20 @@ textarea{width:100%;min-height:80px}
 .bar .lb{position:absolute;display:flex;align-items:center;gap:5px;padding:0 6px;white-space:nowrap;text-shadow:0 0 3px rgba(0,0,0,.35)}
 .bar .lb b,.lbo b{font-weight:700}
 .bar.period{border-radius:1px}
+.bar.erarow::after{display:none}
+.bar.erarow > .lb{z-index:3;pointer-events:none}
+.H .bar.erarow > .lb{top:2px;bottom:2px;padding:0 6px;background:rgba(0,0,0,.5);border-radius:4px;font-size:calc(11px*var(--fs))}
+.V .bar.erarow > .lb{left:2px;right:2px;padding:5px 0;background:rgba(0,0,0,.5);border-radius:4px;font-size:calc(11px*var(--fs))}
+.eseg{position:absolute;overflow:hidden;white-space:nowrap;box-sizing:border-box;font-size:calc(10.5px*var(--fs));color:#fff;text-shadow:0 0 2px rgba(0,0,0,.55);cursor:pointer;border:0 solid rgba(255,255,255,.75)}
+.H .eseg{border-left-width:1px;padding-left:3px;display:flex;align-items:center}
+.V .eseg{border-top-width:1px;padding-top:3px;writing-mode:vertical-rl;display:flex;justify-content:center}
+.eseg.alt{background:rgba(0,0,0,.14)}
+.eseg.gap{background:repeating-linear-gradient(135deg,rgba(255,255,255,.35) 0 4px,transparent 4px 8px);color:rgba(255,255,255,.95);font-size:calc(9.5px*var(--fs))}
+.eseg:hover{background:rgba(255,255,255,.22)}
+#epresetBox .esub{margin-top:6px}
+#erows .erg{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:5px 0}
+#erows .ergl{font-size:12px;color:var(--sub);min-width:4.5em}
+#erows button{font-size:12px;padding:2px 8px}
 .bar.period::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(135deg,rgba(255,255,255,.22) 0 5px,transparent 5px 10px);pointer-events:none}
 .lbo{position:absolute;display:none;align-items:center;gap:5px;font-size:calc(11px*var(--fs));color:var(--ink);white-space:nowrap;pointer-events:none}
 .lbo span{color:var(--sub)}
@@ -361,7 +375,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.34</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.35</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
 <div class="wrap">
 
   <div class="panel">
@@ -443,6 +457,9 @@ textarea{width:100%;min-height:80px}
       <details id="presetBox" open><summary>プリセット（人・入れ替え）</summary><div class="presets" id="presets"></div></details>
       <details id="dpresetBox" style="margin-top:6px"><summary>プリセット（📏長さくらべ：寿命・半減期）</summary><div class="presets" id="dpresets"></div></details>
       <details id="ppresetBox" style="margin-top:6px"><summary>プリセット（期間・できごと・今の画面に足す）</summary><div class="presets" id="ppresets"></div></details>
+      <details id="epresetBox" style="margin-top:6px"><summary>プリセット（元号の行：国・王朝ごと・今の画面に足す）</summary>
+        <div class="presets" id="epresets"></div>
+        <details class="esub"><summary>1行ずつえらぶ</summary><div id="erows"></div></details></details>
       <details style="margin-top:8px" id="catBox">
         <summary>分野から選ぶ</summary>
         <div class="ctrl" style="margin-top:6px">
@@ -522,6 +539,7 @@ textarea{width:100%;min-height:80px}
       <li><b>プリセット（人・入れ替え）</b>：「幕末・明治維新」などを押すと、今の画面と入れ替わってその人たちが並ぶ。</li>
       <li><b>プリセット（期間・できごと）</b>：王朝・戦争・時代のうごきなどを、今の画面に足す。</li>
       <li><b>まとめて追加</b>：「＋ 足す」の中。1行に1人ずつ名前を書いて「追加する」。</li>
+      <li><b>元号の行</b>：「プリセット（元号の行）」で、日本・中国・朝鮮・ベトナムの元号を国・王朝ごとの帯にして足せる。帯の中の区切りを押すと、元号の名前と年が出る。日本の南北朝は「日本（南朝）」「日本（北朝）」の2行に分かれる（どちらが本流とは決めない）。中国は同じ時代の国が別々の行になる。朝鮮・ベトナムは独自の元号だけ。同じ時期に2つの元号が使われた所は、そこだけ帯が2段になる。</li>
       <li><b>自分で追加</b>：名前と始まり・終わりの年を入れると期間（帯）になる。終わりを空けると、その年だけのできごと（線）になる。</li>
       <li><b>分野から選ぶ</b>：データファイルがあるときだけ出る。分野ごとの有名な人から選べる。</li>
     </ul>
@@ -1316,6 +1334,145 @@ function unpackColors(o, L_ids, D_ids){
     ECOL[id] = typeof v==='string' ? {hex:v} : {h:v[0], dl:v[1]||0, ...(v[2]!=null?{s:v[2]}:{})}; }
 }
 
+/* ---------- 元号の行（国・王朝ごと） ----------
+   日本：GENGO_RAW から。南北朝（1331〜1392）は「日本（南朝）」「日本（北朝）」の2行に分けて対等にあつかう
+   中国：CN_RAW（CBDB）から王朝ごと。同じ名前の別の王朝（後漢・宋）は年で分ける
+   朝鮮・ベトナム：独自の元号だけ（英語版Wikipedia「Korean era name」「Vietnamese era name」の表より。反乱・自称は入れない） */
+const KR_RAW = [
+ ['高句麗','永楽',391,412],['高句麗','延寿',451,451],
+ ['新羅','建元',536,551],['新羅','開国',551,568],['新羅','大昌',568,571],['新羅','鴻済',572,584],['新羅','建福',584,634],['新羅','仁平',634,647],['新羅','太和',647,650],
+ ['渤海','仁安',720,737],['渤海','大興',738,774],['渤海','宝暦',774,785],['渤海','大興',785,794],['渤海','中興',794,794],['渤海','正暦',795,809],['渤海','永徳',810,812],
+ ['渤海','朱雀',813,817],['渤海','太始',818,818],['渤海','建興',819,830],['渤海','咸和',831,857],
+ ['後百済','正開',900,936],
+ ['泰封','武泰',904,905],['泰封','聖冊',905,911],['泰封','水徳万歳',911,914],['泰封','政開',914,918],
+ ['高麗','天授',918,933],['高麗','光徳',949,952],['高麗','峻豊',960,963],
+ ['朝鮮王朝末・大韓帝国','開国',1894,1895],['朝鮮王朝末・大韓帝国','建陽',1896,1897],['朝鮮王朝末・大韓帝国','光武',1897,1907],['朝鮮王朝末・大韓帝国','隆熙',1907,1910],
+];
+const KR_NOTE = {'高句麗':'延寿は451年に使われたことだけがわかっている','渤海':'大興は宝暦をはさんで2回使われた','高麗':'このほかの時期は中国の元号を使った',
+  '朝鮮王朝末・大韓帝国':'朝鮮王朝はほとんど中国の元号を使った。開国（1894）からが独自の元号'};
+const VN_RAW = [
+ ['前李朝','天徳',544,548],
+ ['丁朝','太平',970,980],
+ ['前黎朝','天福',980,988],['前黎朝','興統',989,993],['前黎朝','応天',994,1007],['前黎朝','景瑞',1008,1009],
+ ['李朝','順天',1010,1028],['李朝','天成',1028,1034],['李朝','通瑞',1034,1039],['李朝','乾符有道',1039,1042],['李朝','明道',1042,1044],['李朝','天感聖武',1044,1049],
+ ['李朝','崇興大宝',1049,1054],['李朝','龍瑞太平',1054,1058],['李朝','彰聖嘉慶',1059,1065],['李朝','龍彰天嗣',1066,1068],['李朝','天貺宝象',1068,1069],['李朝','神武',1069,1072],
+ ['李朝','太寧',1072,1076],['李朝','英武昭勝',1076,1085],['李朝','広祐',1085,1092],['李朝','会豊',1092,1100],['李朝','龍符',1101,1109],['李朝','会祥大慶',1110,1119],
+ ['李朝','天符睿武',1120,1126],['李朝','天符慶寿',1127,1127],['李朝','天順',1128,1132],['李朝','天彰宝嗣',1133,1138],['李朝','紹明',1138,1140],['李朝','大定',1140,1162],
+ ['李朝','政隆宝応',1163,1174],['李朝','天感至宝',1174,1175],['李朝','貞符',1176,1186],['李朝','天資嘉瑞',1186,1202],['李朝','天嘉宝祐',1202,1205],['李朝','治平龍応',1205,1210],
+ ['李朝','建嘉',1211,1224],['李朝','天彰有道',1224,1225],
+ ['陳朝','建中',1225,1232],['陳朝','天応政平',1232,1251],['陳朝','元豊',1251,1258],['陳朝','紹隆',1258,1272],['陳朝','宝符',1273,1278],['陳朝','紹宝',1279,1285],
+ ['陳朝','重興',1285,1293],['陳朝','興隆',1293,1314],['陳朝','大慶',1314,1323],['陳朝','開泰',1324,1329],['陳朝','開祐',1329,1341],['陳朝','紹豊',1341,1357],
+ ['陳朝','大治',1358,1369],['陳朝','紹慶',1370,1372],['陳朝','隆慶',1373,1377],['陳朝','昌符',1377,1388],['陳朝','光泰',1388,1398],['陳朝','建新',1398,1400],
+ ['胡朝','聖元',1400,1400],['胡朝','紹成',1401,1402],['胡朝','開大',1403,1407],
+ ['後陳朝','興慶',1407,1409],['後陳朝','重光',1409,1413],['後陳朝','天慶',1426,1428],
+ ['黎朝（前期）','順天',1428,1433],['黎朝（前期）','紹平',1434,1439],['黎朝（前期）','大宝',1440,1442],['黎朝（前期）','大和',1443,1453],['黎朝（前期）','延寧',1454,1459],
+ ['黎朝（前期）','天興',1459,1460],['黎朝（前期）','光順',1460,1469],['黎朝（前期）','洪徳',1470,1497],['黎朝（前期）','景統',1498,1504],['黎朝（前期）','泰貞',1504,1504],
+ ['黎朝（前期）','端慶',1505,1509],['黎朝（前期）','洪順',1509,1516],['黎朝（前期）','光紹',1516,1522],['黎朝（前期）','統元',1522,1527],
+ ['莫朝','明徳',1527,1529],['莫朝','大正',1530,1540],['莫朝','広和',1541,1546],['莫朝','永定',1547,1548],['莫朝','景暦',1548,1555],['莫朝','光宝',1555,1564],
+ ['莫朝','淳福',1565,1568],['莫朝','崇康',1568,1578],['莫朝','延成',1578,1585],['莫朝','端泰',1585,1588],['莫朝','興治',1588,1591],['莫朝','洪寧',1591,1592],
+ ['莫朝','武安',1592,1592],['莫朝','宝定',1592,1592],['莫朝','康祐',1593,1593],['莫朝','乾統',1593,1625],['莫朝','順徳',1638,1677],
+ ['黎朝（中興）','元和',1533,1548],['黎朝（中興）','順平',1549,1556],['黎朝（中興）','天祐',1557,1557],['黎朝（中興）','正治',1558,1571],['黎朝（中興）','洪福',1572,1572],
+ ['黎朝（中興）','嘉泰',1573,1577],['黎朝（中興）','光興',1578,1599],['黎朝（中興）','慎徳',1600,1600],['黎朝（中興）','弘定',1600,1619],['黎朝（中興）','永祚',1619,1629],
+ ['黎朝（中興）','徳隆',1629,1635],['黎朝（中興）','陽和',1635,1643],['黎朝（中興）','福泰',1643,1649],['黎朝（中興）','慶徳',1649,1653],['黎朝（中興）','盛徳',1653,1658],
+ ['黎朝（中興）','永寿',1658,1662],['黎朝（中興）','万慶',1662,1662],['黎朝（中興）','景治',1663,1671],['黎朝（中興）','陽徳',1672,1674],['黎朝（中興）','徳元',1674,1675],
+ ['黎朝（中興）','永治',1676,1680],['黎朝（中興）','正和',1680,1705],['黎朝（中興）','永盛',1705,1720],['黎朝（中興）','保泰',1720,1729],['黎朝（中興）','永慶',1729,1732],
+ ['黎朝（中興）','龍徳',1732,1735],['黎朝（中興）','永祐',1735,1740],['黎朝（中興）','景興',1740,1786],['黎朝（中興）','昭統',1787,1789],
+ ['西山朝','泰徳',1778,1793],['西山朝','光中',1788,1792],['西山朝','景盛',1793,1801],['西山朝','宝興',1801,1802],
+ ['阮朝','嘉隆',1802,1819],['阮朝','明命',1820,1841],['阮朝','紹治',1841,1847],['阮朝','嗣徳',1848,1883],['阮朝','建福',1884,1884],['阮朝','咸宜',1885,1885],
+ ['阮朝','同慶',1885,1889],['阮朝','成泰',1889,1907],['阮朝','維新',1907,1916],['阮朝','啓定',1916,1925],['阮朝','保大',1926,1945],
+];
+const VN_NOTE = {'西山朝':'泰徳（阮岳）と光中（阮恵）は同じ時期に別々に使われた','莫朝':'1592年は短い元号がいくつも重なる。高平に逃れたあとの元号もふくむ',
+  '後陳朝':'天慶は黎利が立てた陳暠の元号','黎朝（中興）':'莫朝と同じ時期に南で立てなおした黎朝'};
+const ERA_SRC = {jp:'元号：日本の元号一覧', cn:'元号：CBDB（中国歴代人物伝記資料庫）の年号表', kr:'元号：Wikipedia「Korean era name」', vn:'元号：Wikipedia「Vietnamese era name」'};
+const NB_W = [1331, 1392];   // 日本の南北朝（元弘〜明徳の和約）
+
+let ERA_ROWS = null;   // key → {n, cc, segs:[[元号, はじめ, おわり(描く), 表示の年]], lanes, b, d, note}
+function eraRows(){
+  if(ERA_ROWS) return ERA_ROWS;
+  const R = {}, put = (key, n, cc, segs, note) => {
+    segs = segs.filter(s=>s[2]>s[1]).sort((a,b)=>a[1]-b[1]||a[2]-b[2]);
+    if(!segs.length) return;
+    // 同じ年に何回も変わったときは、その1年を元号の数で割って順に並べる
+    for(let i=0;i<segs.length;){ let j=i; while(j+1<segs.length && segs[j+1][1]===segs[i][1] && !segs[j+1][5]) j++;
+      const k=j-i+1; if(k>1){ const y0=segs[i][1]; for(let t=0;t<k;t++){ segs[i+t][1]=y0+t/k; if(t<k-1) segs[i+t][2]=Math.min(segs[i+t][2], y0+(t+1)/k); } } i=j+1; }
+    // 年の途中で変わった元号の「1年だけの重なり」は前のほうを切りつめる
+    segs.forEach((g,i)=>{ const nx=segs[i+1]; if(nx && !g[5] && nx[1]<g[2] && nx[1]>g[1] && g[2]-nx[1]<=1) g[2]=nx[1]; });
+    // ほんとに同時に使われた所だけ、その部分を段に分ける（ほかは1段）
+    let ci=0; while(ci<segs.length){ let end=segs[ci][2], cj=ci; while(cj+1<segs.length && segs[cj+1][1]<end-1e-9){ cj++; end=Math.max(end, segs[cj][2]); }
+      const cl=segs.slice(ci,cj+1), ends=[]; cl.forEach(g=>{ let l=ends.findIndex(e=>e<=g[1]+1e-9); if(l<0){ l=ends.length; ends.push(0); } ends[l]=g[2]; g[4]=l; });
+      cl.forEach(g=>g[6]=ends.length); ci=cj+1; }
+    const lanes = Math.max(...segs.map(g=>g[6]||1));
+    R[key] = {key, n, cc, segs, lanes, b:Math.floor(Math.min(...segs.map(s=>s[1]))), d:Math.ceil(Math.max(...segs.map(s=>s[2]))), note:[note, ERA_SRC[cc]].filter(Boolean).join(' ／ ')};
+  };
+  // 日本（元号が変わった年＝次の元号の始まりの年）
+  const jp = GENGO_RAW.map(([n,s,e,f])=>[n, s, Math.min(e>s?e:s+1, CUR+1), f]);
+  const lbl = (n,s,e) => `${fmtY(s)}〜${fmtY(e)}`;
+  const main=[], south=[], north=[];
+  for(const [n,s,e,f] of jp){
+    if(f!=='S' && f!=='B'){ if(e<=NB_W[0] || s>=NB_W[1]) main.push([n,s,e,lbl(n,s,e)]); else { if(s<NB_W[0]) main.push([n,s,NB_W[0],lbl(n,s,e)]); if(e>NB_W[1]) main.push([n,NB_W[1],e,lbl(n,s,e)]); } }
+    if(s<NB_W[1] && e>NB_W[0]){
+      const cs=Math.max(s,NB_W[0]), ce=Math.min(e,NB_W[1]);
+      if(f==='S') south.push([n,cs,ce,lbl(n,s,e)]);
+      else if(f==='B'){ south.push([n,cs,Math.min(ce,1336),lbl(n,s,1336)]); north.push([n,cs,ce,lbl(n,s,e)]); }   // 建武：南朝は延元まで、北朝は暦応まで
+      else north.push([n,cs,ce,lbl(n,s,e)]);
+    }
+  }
+  main.push(['（南北朝：日本（南朝）・日本（北朝）の行へ）', NB_W[0], NB_W[1], `${NB_W[0]}〜${NB_W[1]}`, 0, 'gap']);
+  put('jp','日本','jp',main);
+  put('jpS','日本（南朝）','jp',south,'南北朝のあいだ南朝が使った元号。歴代の天皇の数え方では南朝が正統（1911年〜）');
+  put('jpN','日本（北朝）','jp',north,'南北朝のあいだ北朝が使った元号。今の皇室は北朝の流れ');
+  // 中国（年号表の終わりの年はその年まで使った年）
+  const cnName = (d,s) => d==='後漢' ? (s>800?'後漢（五代）':'後漢') : d==='宋' ? (s<600?'宋（南朝）':'宋') : d==='周' ? '周（武周）' : d;
+  const cn = {};
+  for(const [d,n,s,e] of CN_RAW){ const k=cnName(d,s); (cn[k]=cn[k]||[]).push([n, s, e+1, `${fmtY(s)}〜${fmtY(e)}`]); }
+  for(const [k,segs] of Object.entries(cn)) put('cn:'+k, '中国・'+k, 'cn', segs, k==='周（武周）'?'則天武后の周（唐が一時とだえた）':k==='宋'?'北宋・南宋':'');
+  // 朝鮮・ベトナム（表の「終わりの年」はその年まで。次の元号とすきまができないようにつなぐ）
+  const smooth = (raw, cc, pre, notes) => {
+    const by={}; raw.forEach(([r,n,s,e])=>{ (by[r]=by[r]||[]).push([n,s,e]); });
+    for(const [r,list] of Object.entries(by)){
+      // 次の元号がこの元号の最後の年に始まったら、その年で切りかえる。そうでなければ最後の年の終わりまで
+      const segs = list.map(([n,s,e],i)=>{ const nx=list[i+1]; const ee = (nx && nx[1]===e) ? Math.max(e, s+1) : e+1;
+        return [n, s, ee, s===e?`${s}`:`${s}〜${e}`]; });
+      put(cc+':'+r, pre+r, cc, segs, notes[r]);
+    }
+  };
+  smooth(KR_RAW,'kr','朝鮮・',KR_NOTE);
+  smooth(VN_RAW,'vn','ベトナム・',VN_NOTE);
+  return ERA_ROWS = R;
+}
+const ERA_SETS = [
+  {name:'日本（南北朝は2行）', cc:'jp'}, {name:'中国（王朝ごと）', cc:'cn'}, {name:'朝鮮（独自の元号）', cc:'kr'}, {name:'ベトナム（独自の元号）', cc:'vn'},
+];
+function eraRowItem(key){
+  const r=eraRows()[key]; if(!r) return null;
+  const id='M'+(manSeq++);
+  return {id, n:r.n, type:'period', b:r.b, d:r.d, bm:r.b, dm:r.d, bl:fmtY(r.b), dl: r.d>CUR ? '今' : fmtY(r.d), er:key, note:r.note};
+}
+// まとめて足す（cc：国、keys：1行ずつ）
+function addEraRows(keys, gname){
+  const have=new Set(list.map(id=>PEOPLE[id]&&PEOPLE[id].er).filter(Boolean));
+  const pa=ACTIVE, gN=newGroup(gname); let n=0;
+  for(const k of keys){ if(have.has(k)) continue; const it=eraRowItem(k); if(!it) continue; PEOPLE[it.id]=it; list.push(it.id); GRP[it.id]=gN; n++; }
+  dropIfEmpty(gN, pa);
+  if(SET.mode==='dur'){ SET.mode='time'; SET.orient=SET.orient==='v'?'v':'h'; applySet(); }
+  render(); syncURL();
+  toast(n ? `元号の行を${n}本足した（帯の区切りを押すと元号の名前と年が出る）` : 'もう並んでる');
+}
+function eraKeysOf(cc){ return Object.values(eraRows()).filter(r=>r.cc===cc).sort((a,b)=>a.b-b.b).map(r=>r.key); }
+// 帯の中の元号の区切り
+function eraSegsHTML(p, g, V){
+  const r=eraRows()[p.er]; if(!r) return '';
+  const span=(g.right-g.left)||1;
+  return r.segs.map((s,k)=>{
+    const a=(s[1]-g.left)/span*100, w=(s[2]-s[1])/span*100, ln=s[4]||0, L=s[6]||1;
+    const yrs = s[2]-s[1];
+    const pop = s[5]==='gap' ? s[0] : `${r.n}　${s[0]}（${s[3]}、${yrs<1?'1年たらず':Math.round(yrs)+'年'}）`;
+    const pos = V ? `top:${a.toFixed(3)}%;height:${w.toFixed(3)}%;left:${(ln*100/L).toFixed(2)}%;width:${(100/L).toFixed(2)}%`
+                  : `left:${a.toFixed(3)}%;width:${w.toFixed(3)}%;top:${(ln*100/L).toFixed(2)}%;height:${(100/L).toFixed(2)}%`;
+    return `<span class="eseg${k%2?' alt':''}${s[5]==='gap'?' gap':''}" style="${pos}" data-pop="${esc(pop)}">${esc(s[0])}</span>`;
+  }).join('');
+}
+
 /* ---------- 状態 ---------- */
 let DATA = null;
 const PEOPLE = {};          // id -> 人（と、自分で足した期間 type:'period'）
@@ -1632,6 +1789,7 @@ function presetKey(o, key){   // プリセットの何番目か（古いデー�
 function packState(){
   const L=list.map(id=>{ const p=PEOPLE[id];
     if(/^Q\d+$/.test(id)) return +id.slice(1);
+    if(p && p.er) return ['r', p.er];
     if(p && p.pre){ const k=presetKey(p,'items'); if(k) return k; }
     { const q=p._o?{...p,...p._o}:p; return ['p', q.n, q.b, q.d]; }; });
   const E=events.map(e=>{ if(e.pre){ const k=presetKey(e,'events'); if(k) return k; } return ['e', e.n, e.y]; });
@@ -1657,6 +1815,7 @@ async function unpackState(o){
     if(typeof x==='number'){ ids.push('Q'+x); }
     else { const id='M'+(manSeq++);
       if(Array.isArray(x) && x[0]==='p'){ PEOPLE[id]={id, n:x[1], type:'period', b:x[2], d:x[3]}; ids.push(id); }
+      else if(Array.isArray(x) && x[0]==='r'){ const it=eraRowItem(x[1]); if(it){ PEOPLE[it.id]=it; ids.push(it.id); } }
       else if(Array.isArray(x) && typeof x[0]==='number'){ const it=(PERIOD_PRESETS[x[0]]||{}).items?.[x[1]]; const q=it&&presetPeriod(it); if(q){ PEOPLE[id]={id,...q,pre:1,pk:x}; ids.push(id); } } }
     Lids.push(ids.length>n0 ? ids[ids.length-1] : null);
   }
@@ -1906,7 +2065,7 @@ function render(){
   const evLbl = evShow.map(ev=>`<div class="evlb" data-eid="${ev.id}" style="${pos(ev.y)}" title="押すと「消す」が出る">${esc(fmtY(ev.y))} ${esc(ev.n)}</div>`).join('');
 
   const handle = p => `${gripHTML(p.id)}<button class="x" title="消す" data-rm="${p.id}">×</button>`;
-  const barHTML = (p,g) => `<div class="${g.cls}" data-sel="${p.id}" style="${box(g.left,g.right)};background:linear-gradient(${V?'180deg':'90deg'}, ${g.st.join(', ')})" title="${esc(p.n)} ${esc(g.txt)}${g.note?'&#10;'+esc(g.note):''}"><span class="lb" style="${V?'top':'left'}:${g.lbAt}"><b>${esc(p.n)}</b>${esc(g.txt)}</span></div>
+  const barHTML = (p,g) => `<div class="${g.cls}${p.er?' erarow':''}" data-sel="${p.id}" style="${box(g.left,g.right)};background:linear-gradient(${V?'180deg':'90deg'}, ${g.st.join(', ')})" title="${esc(p.n)} ${esc(g.txt)}${g.note?'&#10;'+esc(g.note):''}"><span class="lb" style="${V?'top':'left'}:${g.lbAt}"><b>${esc(p.n)}</b>${p.er?'':esc(g.txt)}</span>${p.er?eraSegsHTML(p,g,V):''}</div>
       <span class="lbo"><b>${esc(p.n)}</b><span>${esc(g.txt)}</span></span>
       <span class="age" data-b="${g.ageB}" data-s="${g.left}" data-e="${g.right}" data-f="${g.ageF}" data-ua="${g.ua}"></span>`;
 
@@ -2071,7 +2230,7 @@ function fitLabels(){
 // 時代・元号の名前、入らないものは隠す
 function fitSegs(){
   const V = SET.orient==='v';
-  document.querySelectorAll('#chart .seglb').forEach(el=>{
+  document.querySelectorAll('#chart .seglb, #chart .eseg').forEach(el=>{
     el.style.color='';
     const over = V ? el.scrollHeight > el.clientHeight+1 : el.scrollWidth > el.clientWidth+1;
     if(over) el.style.color='transparent';
@@ -2135,7 +2294,7 @@ function onMove(ev){
 function hideCursor(){ const cl=$('#cline'), cy=$('#cyear'); if(cl) cl.style.display='none'; if(cy) cy.style.display='none'; document.querySelectorAll('#chart .age').forEach(a=>a.style.display='none'); }
 $('#chart').addEventListener('pointermove', onMove);
 $('#chart').addEventListener('pointerleave', hideCursor);
-document.addEventListener('click', ev=>{ if(!ev.target.closest('.gseg')) hidePop(); });
+document.addEventListener('click', ev=>{ if(!ev.target.closest('.gseg, .eseg')) hidePop(); });
 window.addEventListener('scroll', ()=>hidePop(), {passive:true});
 
 /* ---------- 名前をつまんで並べ替え ---------- */
@@ -2329,7 +2488,7 @@ $('#chart').addEventListener('click', ev=>{
   if(justDragged) return;
   const el = ev.target.closest('.evlb');
   if(el){ showEvPop(el.dataset.eid, ev.clientX, ev.clientY); return; }
-  const gs = ev.target.closest('.gseg');
+  const gs = ev.target.closest('.gseg, .eseg');
   if(gs){
     if(hidePop.el===gs){ hidePop(); return; }
     const pop=$('#gpop'); pop.textContent=gs.dataset.pop; pop.style.display='block';
@@ -2339,7 +2498,7 @@ $('#chart').addEventListener('click', ev=>{
     hidePop.el=gs; return;
   }
   const rm = ev.target.closest('[data-rm]'); if(rm){ removeId(rm.dataset.rm); return; }
-  if(BRUSH && editing() && !ev.target.closest('[data-rm],.evlb,.gseg')){ const t=ev.target.closest('[data-cp],[data-sel],.dh[data-id],.row[data-id]'); if(t){ applyBrush(t.dataset.cp||t.dataset.sel||t.dataset.id); return; } }
+  if(BRUSH && editing() && !ev.target.closest('[data-rm],.evlb,.gseg,.eseg')){ const t=ev.target.closest('[data-cp],[data-sel],.dh[data-id],.row[data-id]'); if(t){ applyBrush(t.dataset.cp||t.dataset.sel||t.dataset.id); return; } }
   const cp = ev.target.closest('[data-cp]');
   if(cp){ if($('#cpop').dataset.for==='p:'+cp.dataset.cp){ hideCPop(); return; } const r=cp.getBoundingClientRect(); showPersonPop(cp.dataset.cp, r.left+r.width/2, r.bottom); return; }
   if(ev.target.closest('.grip')) return;
@@ -2464,6 +2623,13 @@ function drawPPresets(){
   $('#ppresets').innerHTML = PERIOD_PRESETS.map((p,i)=>`<button data-ppi="${i}">${esc(p.name)}</button>`).join('');
 }
 $('#ppresets').addEventListener('click', ev=>{ const b=ev.target.closest('[data-ppi]'); if(b) addPresetSet(+b.dataset.ppi); });
+// 元号の行
+$('#epresets').innerHTML = ERA_SETS.map((st,i)=>`<button data-esi="${i}">${esc(st.name)}</button>`).join('');
+$('#erows').innerHTML = ERA_SETS.map(st=>`<div class="erg"><span class="ergl">${esc(st.name.replace(/（.*$/,''))}</span>${eraKeysOf(st.cc).map(k=>`<button data-erk="${esc(k)}">${esc(eraRows()[k].n.replace(/^(中国|朝鮮|ベトナム)・/,''))}</button>`).join('')}</div>`).join('');
+$('#epresetBox').addEventListener('click', ev=>{
+  const a=ev.target.closest('[data-esi]'); if(a){ const st=ERA_SETS[+a.dataset.esi]; addEraRows(eraKeysOf(st.cc), '元号：'+st.name.replace(/（.*$/,'')); return; }
+  const b=ev.target.closest('[data-erk]'); if(b){ const r=eraRows()[b.dataset.erk]; if(r) addEraRows([r.key], '元号：'+r.n); }
+});
 function drawPresets(){
   $('#presets').innerHTML = '<span class="lbl" style="align-self:center">プリセット：</span>' +
     presetList().map((p,i)=>`<button data-pi="${i}">${esc(p.name)}</button>`).join('');
