@@ -375,7 +375,7 @@ textarea{width:100%;min-height:80px}
 </style>
 </head>
 <body>
-<header><h1>生没年グラフ</h1><span class="ver">v0.35</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
+<header><h1>生没年グラフ</h1><span class="ver">v0.36</span><span class="lbl" id="dataStat"></span><button class="helpBtn" id="helpBtn" title="使い方を見る">？ 使い方</button></header>
 <div class="wrap">
 
   <div class="panel">
@@ -427,6 +427,7 @@ textarea{width:100%;min-height:80px}
         <label>色分け<select id="cmode">
           <option value="group">まとまりごと（自動で色分け）</option><option value="each">ひとりずつ（自分で色をえらぶ）</option><option value="name">ひとつずつ自動（かぶらない色）</option>
         </select></label>
+        <label>元号の行の色<select id="eracol"><option value="seg">元号ごとに変える</option><option value="row">帯の色のまま</option></select></label>
       </div>
       <div class="ctrl" style="margin-top:6px"><label class="ck"><input type="checkbox" id="showLg"> 凡例をグラフに出す（画像にも写る）</label></div>
       <div class="lbl" style="margin-top:4px">設定を開いているあいだは、グラフの上に色づけの道具が出る（閉じるとかくれる）</div>
@@ -539,7 +540,7 @@ textarea{width:100%;min-height:80px}
       <li><b>プリセット（人・入れ替え）</b>：「幕末・明治維新」などを押すと、今の画面と入れ替わってその人たちが並ぶ。</li>
       <li><b>プリセット（期間・できごと）</b>：王朝・戦争・時代のうごきなどを、今の画面に足す。</li>
       <li><b>まとめて追加</b>：「＋ 足す」の中。1行に1人ずつ名前を書いて「追加する」。</li>
-      <li><b>元号の行</b>：「プリセット（元号の行）」で、日本・中国・朝鮮・ベトナムの元号を国・王朝ごとの帯にして足せる。帯の中の区切りを押すと、元号の名前と年が出る。日本の南北朝は「日本（南朝）」「日本（北朝）」の2行に分かれる（どちらが本流とは決めない）。中国は同じ時代の国が別々の行になる。朝鮮・ベトナムは独自の元号だけ。同じ時期に2つの元号が使われた所は、そこだけ帯が2段になる。</li>
+      <li><b>元号の行</b>：「プリセット（元号の行）」で、日本・中国・朝鮮・ベトナムの元号を国・王朝ごとの帯にして足せる。帯の中の区切りを押すと、元号の名前と年が出る。日本の南北朝は「日本（南朝）」「日本（北朝）」の2行に分かれる（どちらが本流とは決めない）。中国は同じ時代の国が別々の行になる。朝鮮・ベトナムは独自の元号だけ。同じ時期に2つの元号が使われた所は、そこだけ帯が2段になる。設定の「元号の行の色」で、元号ごとに色を変える（となりとかぶらない、帯の色の系統のまま）か、帯の色のままにするかをえらべる。</li>
       <li><b>自分で追加</b>：名前と始まり・終わりの年を入れると期間（帯）になる。終わりを空けると、その年だけのできごと（線）になる。</li>
       <li><b>分野から選ぶ</b>：データファイルがあるときだけ出る。分野ごとの有名な人から選べる。</li>
     </ul>
@@ -1459,6 +1460,14 @@ function addEraRows(keys, gname){
   toast(n ? `元号の行を${n}本足した（帯の区切りを押すと元号の名前と年が出る）` : 'もう並んでる');
 }
 function eraKeysOf(cc){ return Object.values(eraRows()).filter(r=>r.cc===cc).sort((a,b)=>a.b-b.b).map(r=>r.key); }
+// 元号ごとの色（帯の色の系統の中で5色を回す。段が分かれた所は下の段を2つずらす）
+const ERA_DH=[0,-24,14,-12,26], ERA_DL=[0,9,-9,4,-5];
+function eraSegCol(id, k){
+  const c = COLMAP[id] || {h:+colorH(id), dl:0}, i=k%5, h=((+c.h + ERA_DH[i])%360+360)%360;
+  if(c.l!=null) return `hsl(${h.toFixed(1)} ${c.s}% ${Math.max(15,Math.min(85,c.l+ERA_DL[i]))}%)`;
+  const S = c.rel ? `${c.s}%` : 'var(--bs)', dl=(c.dl||0)+ERA_DL[i];
+  return `hsl(${h.toFixed(1)} ${S} calc(var(--bl) ${dl<0?'-':'+'} ${Math.abs(dl)}%))`;
+}
 // 帯の中の元号の区切り
 function eraSegsHTML(p, g, V){
   const r=eraRows()[p.er]; if(!r) return '';
@@ -1469,7 +1478,8 @@ function eraSegsHTML(p, g, V){
     const pop = s[5]==='gap' ? s[0] : `${r.n}　${s[0]}（${s[3]}、${yrs<1?'1年たらず':Math.round(yrs)+'年'}）`;
     const pos = V ? `top:${a.toFixed(3)}%;height:${w.toFixed(3)}%;left:${(ln*100/L).toFixed(2)}%;width:${(100/L).toFixed(2)}%`
                   : `left:${a.toFixed(3)}%;width:${w.toFixed(3)}%;top:${(ln*100/L).toFixed(2)}%;height:${(100/L).toFixed(2)}%`;
-    return `<span class="eseg${k%2?' alt':''}${s[5]==='gap'?' gap':''}" style="${pos}" data-pop="${esc(pop)}">${esc(s[0])}</span>`;
+    const byCol = SET.eracol!=='row' && s[5]!=='gap';
+    return `<span class="eseg${!byCol&&k%2?' alt':''}${s[5]==='gap'?' gap':''}" style="${pos}${byCol?`;background:${eraSegCol(p.id, k+ln*2)}`:''}" data-pop="${esc(pop)}">${esc(s[0])}</span>`;
   }).join('');
 }
 
@@ -1481,7 +1491,7 @@ let events = [];            // できごと {id,n,y}
 let selected = [];
 let colorIdx = {}, nextColor = 0, manSeq = 1;
 const SET_KEY='sbg_view_v1';
-const SET = Object.assign({cmode:'group', legend:false, mode:'time', dunit:'auto', dsort:'asc', font:'sys', fs:1, orient:'h', gtick:false, gband:false, vscale:1, gmode:'jp', theme:'auto', glabel:true, eralbl:true, lpos:'in'}, lsGet(SET_KEY)||{});
+const SET = Object.assign({cmode:'group', legend:false, eracol:'seg', mode:'time', dunit:'auto', dsort:'asc', font:'sys', fs:1, orient:'h', gtick:false, gband:false, vscale:1, gmode:'jp', theme:'auto', glabel:true, eralbl:true, lpos:'in'}, lsGet(SET_KEY)||{});
 
 /* ---------- 小物 ---------- */
 function $(s){ return document.querySelector(s); }
@@ -1757,9 +1767,10 @@ let READY=false;            // 起動が終わるまでURLは書きかえない�
 function syncURLSoon(){ clearTimeout(syncURLSoon._t); syncURLSoon._t=setTimeout(syncURL, 400); }
 // 見た目の設定をURL用の短い文字に：向き-色-元号-ちぇっく-背景-並べ順
 function viewCode(){ const f=(SET.gtick?1:0)+(SET.gband?2:0)+(SET.glabel?4:0)+(SET.eralbl?8:0);
-  return [SET.orient, SET.theme, SET.gmode, f, $('#era').value, $('#sort').value, SET.lpos, SET.font, String(SET.fs||1), SET.mode==='dur'?'d':'t', SET.dunit, SET.dsort, {group:'g',each:'e',name:'n'}[SET.cmode]||'g', SET.legend?'1':'0'].join('-'); }
+  return [SET.orient, SET.theme, SET.gmode, f, $('#era').value, $('#sort').value, SET.lpos, SET.font, String(SET.fs||1), SET.mode==='dur'?'d':'t', SET.dunit, SET.dsort, {group:'g',each:'e',name:'n'}[SET.cmode]||'g', SET.legend?'1':'0', SET.eracol==='row'?'r':'s'].join('-'); }
 function readViewCode(v){
-  const [o,th,g,f,era,sort,lp,fo,fz,md,du,ds,cm,lg]=(v||'').split('-'); if(!o) return;
+  const [o,th,g,f,era,sort,lp,fo,fz,md,du,ds,cm,lg,ec]=(v||'').split('-'); if(!o) return;
+  if(ec==='r'||ec==='s') SET.eracol = ec==='r' ? 'row' : 'seg';
   if(lg==='1'||lg==='0') SET.legend = lg==='1';
   if(cm) SET.cmode = {g:'group',e:'each',n:'name'}[cm] || SET.cmode;
   if(md==='d') SET.mode='dur'; else if(md==='t') SET.mode='time';
@@ -2851,7 +2862,7 @@ function applySet(){
   document.documentElement.dataset.theme = SET.theme;
   document.documentElement.dataset.font = SET.font; loadFont(SET.font);
   document.documentElement.style.setProperty('--fs', String(SET.fs||1));
-  $('#font').value = SET.font; $('#fs').value = String(SET.fs||1); $('#cmode').value = SET.cmode; $('#showLg').checked = !!SET.legend;
+  $('#font').value = SET.font; $('#fs').value = String(SET.fs||1); $('#cmode').value = SET.cmode; $('#showLg').checked = !!SET.legend; $('#eracol').value = SET.eracol||'seg';
   if(READY) lsSet(SET_KEY, SET);   // 共有URLで開いたときの設定は、その人の保存設定に上書きしない
   syncURLSoon();
 }
@@ -2871,6 +2882,7 @@ $('#glabel').addEventListener('change', ()=>{ SET.glabel=$('#glabel').checked; a
 $('#eralbl').addEventListener('change', ()=>{ SET.eralbl=$('#eralbl').checked; applySet(); render(); });
 $('#theme').addEventListener('change', ()=>{ SET.theme=$('#theme').value; applySet(); render(); });
 $('#cmode').addEventListener('change', ()=>{ SET.cmode=$('#cmode').value; BRUSH=null; hideCPop(); applySet(); render(); });
+$('#eracol').addEventListener('change', ()=>{ SET.eracol=$('#eracol').value; applySet(); render(); });
 $('#showLg').addEventListener('change', ()=>{ SET.legend=$('#showLg').checked; applySet(); render(); });
 $('#sort').addEventListener('change', ()=>{ render(); syncURL(); });
 $('#era').addEventListener('change', ()=>{ render(); syncURLSoon(); });
@@ -3006,7 +3018,7 @@ $('#loadFile').addEventListener('change', async ev=>{
     colorIdx={}; nextColor=0;
     const cc=d.colors||{}; resetGroups(); GROUPS=(cc.groups||[]).map(G=>({...G})); GRP={...(cc.grp||{})}; ECOL={...(cc.ecol||{})}; ACTIVE=cc.active||0; GSEQ=Math.max(cc.gseq||1, ...GROUPS.map(G=>G.g+1), 1);
     const s=d.settings||{};
-    Object.assign(SET, {orient:s.orient||'h', gtick:!!s.gtick, gband:!!s.gband, gmode:s.gmode||'jp', theme:s.theme||SET.theme, glabel:s.glabel!==false, eralbl:s.eralbl!==false, lpos:s.lpos||'in', font:s.font||SET.font, fs:s.fs||1, cmode:s.cmode||'group', legend:!!s.legend, mode:s.mode||'time', dunit:s.dunit||'auto', dsort:s.dsort||'asc'});
+    Object.assign(SET, {orient:s.orient||'h', gtick:!!s.gtick, gband:!!s.gband, gmode:s.gmode||'jp', theme:s.theme||SET.theme, glabel:s.glabel!==false, eralbl:s.eralbl!==false, lpos:s.lpos||'in', font:s.font||SET.font, fs:s.fs||1, cmode:s.cmode||'group', legend:!!s.legend, eracol:s.eracol||'seg', mode:s.mode||'time', dunit:s.dunit||'auto', dsort:s.dsort||'asc'});
     if(s.sort) $('#sort').value=s.sort; if(s.era) $('#era').value=s.era;
     $('#title').value=d.title||''; syncTitle(false);
     applySet(); render(); syncURL(); toast('読み込んだ！');
